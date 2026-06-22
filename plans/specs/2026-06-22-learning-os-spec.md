@@ -326,3 +326,28 @@ tags: [换股重组, 对价]
   surfacing due-card counts / `next_action` from `registry.json` inside Obsidian; (c) two-way sync
   of FSRS state with an Obsidian SR plugin. Revisit after MVP dogfooding; keep markdown/wikilink
   formats stable so any of these stays cheap.
+- **URL → md ingestion ("send a link, learn it") — ROADMAP, NOT in MVP (idea logged 2026-06-22).**
+  Vision: the user pastes ONE link and learn-everything fetches the source, extracts the text /
+  subtitles to markdown into the track's `notes/sources/`, then the existing domain tutor-ingest
+  loop takes over (read-along teaching → cards). This closes the product into a complete flow:
+  **link in → learning out.**
+  - **Design seam = an optional "ingest adapter" in front of the domain ingest** (kept OUT of the
+    pip-free core, like the Anki export adapter, since it needs network + browser/yt-dlp deps).
+    It dispatches by URL type → returns a source `.md`; everything downstream is unchanged.
+  - **REUSE, don't rebuild** — the author already owns skills doing exactly this; the adapter
+    should shell out to / wrap them rather than reimplement:
+    - web articles / blogs → Playwright or Crawl4AI (`web-crawl-workflow`) + readability → md
+    - 微信公众号 → `wechat-article-fetch`
+    - video (B站 / YouTube / 抖音) → subtitles via yt-dlp; fallback audio → FunASR (`video-notes`,
+      `funasr-transcribe`)
+    - PDF → `mineru-ocr` / pdf extraction
+  - **Public vs login-gated**: Playwright/yt-dlp for public sources; for login-gated / anti-bot
+    pages (YouTube "confirm you're not a bot", 抖音 needs `--browser edge`, paywalls) use a
+    logged-in browser path (OpenCLI / browser-with-session). Surface these as explicit limits,
+    not silent failures.
+  - **Constraints to honor**: scraped content stays UNTRUSTED (DATA_BOUNDARY — already handled in
+    ingest); personal-learning / fair-use only; keep the core pip-free (adapter is opt-in with its
+    own deps); confirm before sending confidential URLs to the host model.
+  - **Status**: schedule after `exam`/`applied` modes (or alongside, since it's an isolated
+    adapter). Spike first: confirm yt-dlp + a chosen scraper produce clean md on 1 article + 1
+    video before wiring the adapter.
