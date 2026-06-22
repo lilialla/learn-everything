@@ -1,0 +1,22 @@
+# Learner data is private — keep the folder, ignore its contents.
+/tracks/*
+!/tracks/.gitkeep
+
+# Personal learner profile (copy from profile.example.md).
+profile.md
+
+# registry.json is a rebuildable cache of the user's personal tracks
+# (regenerate with `python3 scripts/registry.py rebuild`). Keep it out of the
+# clean, data-free product repo so track ids don't leak.
+/registry.json
+
+# Python bytecode / caches.
+__pycache__/
+*.pyc
+
+# Backups (engine writes *.bak / review-state backups).
+*.bak
+*.bak.*
+
+# OS cruft.
+.DS_Store
