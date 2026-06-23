@@ -37,8 +37,10 @@ out to the fixed CLI contract below, and (3) run the right pedagogy loop from `m
   teaching move, silently infer the learner's grasp/misconception/load and condition the next
   question, metaphor, and difficulty on it. Available pedagogies in `methods/`: `tutor`
   (read-along teaching — the default for `domain` learning), `socratic`, `feynman`,
-  `active-recall` (the REVIEW default). Load the track's `pedagogy:` file; for REVIEW use
-  `active-recall` unless the card keeps failing (then switch to `socratic`/`feynman` to re-teach).
+  `active-recall` (the REVIEW default), and `elaboration` (the **up-shift** for a learner who
+  already has it — load it on learner-model's `solid`/`bored`/`over-confident` branch instead of
+  re-explaining). Load the track's `pedagogy:` file; for REVIEW use `active-recall` unless the
+  card keeps failing (then switch to `socratic`/`feynman` to re-teach).
 - **Also compose `methods/learning-science.md`** (the cross-cutting "why"): ground each track in a
   `MISSION.md` (the real-world why; interview if vague), aim for storage strength via desirable
   difficulty, keep teaching inside the zone of proximal development, never trust parametric knowledge
@@ -126,7 +128,11 @@ When the user asks "what should I do today / what first / plan my day":
 ### 3. RESUME
 
 1. Read `tracks/<id>/TRACK.md` (frontmatter + `## Goal` + `## Log`).
-2. Show the user the `next_action` and recent log rows.
+2. Show the user where they left off:
+   - the `next_action` field; **if it's empty/None, fall back to the most recent `## Log`
+     row's "what happened"** as the resume pointer (never show a blank "next step").
+   - if the frontmatter has an optional `position` field (e.g. `ch5 §3` / `chunk 12/40`,
+     written by a curriculum/long-document loop), show it verbatim too.
 3. Continue working **in that track's `mode` and `pedagogy`** — load the matching
    `methods/<pedagogy>.md` and follow it.
 
@@ -181,8 +187,11 @@ edits). **Write nothing to disk until the user explicitly approves.**
    The next two steps are yours to do by hand.
 2. **[model — you write this file directly; no CLI does it]** Write the source + Map into
    `tracks/<id>/notes/<date>-<slug>.md`.
-3. **[model — you write this file directly; no CLI does it]** Add wikilinks to the new
-   cards in `tracks/<id>/plan.md`.
+3. **[model — you write this file directly; no CLI does it]** Update the living MOC
+   `tracks/<id>/plan.md` (it ships with `## Sessions` and `## Cards` sections): add one
+   bullet under `## Sessions` (`<date> — <topic> — [[notes/<file>]]`) and the new
+   `[[card-XXXX]]` links under `## Cards`, grouped by theme. Don't leave plan.md as the
+   empty skeleton — it's the Obsidian split-screen map of the track.
 4. **[engine — CLI]** Record progress:
    `python3 scripts/registry.py log --track <id> --what "Ingested <source>; added N cards" --next "<next step>" [--artifacts "notes/<file>"]`
 

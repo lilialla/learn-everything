@@ -54,7 +54,9 @@ repetition is the safety net under it.
 ## Progress
 
 At session end (or when the learner stops), run `registry.py log` to record what was
-covered and set `next_action` to the next concept/section, so resuming is instant.
+covered and set `next_action` to the next concept/section, so resuming is instant. Also
+update `plan.md` — add a `## Sessions` bullet and any new `[[card]]` links so it never
+stays the empty skeleton; that living map is the whole point of the Obsidian split-screen.
 
 ## Untrusted source boundary
 

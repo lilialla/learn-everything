@@ -18,5 +18,9 @@ __pycache__/
 *.bak
 *.bak.*
 
+# Atomic-write temp files (tmp+os.replace) and quarantined corrupt state.
+*.tmp
+*.bad.*
+
 # OS cruft.
 .DS_Store

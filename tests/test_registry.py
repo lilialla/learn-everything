@@ -462,5 +462,39 @@ class RegistryTestCase(unittest.TestCase):
         self.assertEqual(plan["summary"]["budget_min"], 60)
 
 
+    # -- D10: read inline / cloze cards without leaking the answer ---------
+
+    def test_read_card_question_inline_and_cloze(self):
+        self._make_track()
+        cdir = self.root / "tracks" / "python" / "cards"
+        cdir.mkdir(parents=True, exist_ok=True)
+        (cdir / "card-0001.md").write_text(
+            "---\nid: card-0001\ntags: []\n---\n#flashcards/python\n\n"
+            "What is a closure::A function capturing its scope\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            registry.read_card_question("python", "card-0001", self.root),
+            "What is a closure",
+        )
+        (cdir / "card-0002.md").write_text(
+            "---\nid: card-0002\ntags: []\n---\n#flashcards/python\n\n"
+            "The capital of France is ==Paris==.\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(
+            registry.read_card_question("python", "card-0002", self.root),
+            "The capital of France is [...].",
+        )
+
+    # -- D11: atomic writes leave no temp turds + correct content ----------
+
+    def test_atomic_write_is_clean(self):
+        p = self.root / "sub" / "f.json"
+        registry._write_json(p, {"a": 1, "z": "值"})
+        self.assertEqual(json.loads(p.read_text("utf-8")), {"a": 1, "z": "值"})
+        self.assertEqual(list((self.root / "sub").glob("*.tmp")), [])
+
+
 if __name__ == "__main__":
     unittest.main()

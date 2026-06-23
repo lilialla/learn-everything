@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import tempfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -80,11 +82,30 @@ def _read_json(path: Path) -> dict:
         return json.load(fh)
 
 
-def _write_json(path: Path, data) -> None:
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Write text via a temp file + os.replace so a crash/sync mid-write can't
+    truncate the target. Critical under Google Drive sync, where a torn
+    review-state.json would otherwise trip the corrupt-state guard. The temp file
+    is created in the SAME directory so os.replace is a true atomic rename.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
-        json.dump(data, fh, ensure_ascii=False, indent=2)
-        fh.write("\n")
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _write_json(path: Path, data) -> None:
+    _atomic_write_text(
+        path, json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +245,20 @@ def mission_present(track_id: str, root: Path | None = None) -> bool:
         return False
 
 
+def _plan_md_skeleton(title: str) -> str:
+    """A living map-of-content skeleton (not a dead stub), so the Obsidian
+    split-screen has real structure to grow into: sessions + cards get linked here."""
+    return (
+        f"# {title} — Map of Content\n\n"
+        "> The track's living map. As you learn, link each session and card here so the\n"
+        "> whole track stays navigable (open this folder as an Obsidian vault).\n\n"
+        "## Sessions\n"
+        "<!-- one bullet per teaching/ingest session: date — topic — [[notes/<file>]] -->\n\n"
+        "## Cards\n"
+        "<!-- [[card-0001]] … grouped by theme as the deck grows -->\n"
+    )
+
+
 def _build_track_md(meta: dict, goal: str) -> str:
     """Compose a fresh TRACK.md body."""
     parts = [
@@ -274,7 +309,7 @@ def update_track_meta(track_id: str, updates: dict, root: Path | None = None) ->
     new_text = emit_frontmatter(meta) + "\n" + "\n".join(body_lines)
     if not new_text.endswith("\n"):
         new_text += "\n"
-    path.write_text(new_text, encoding="utf-8")
+    _atomic_write_text(path, new_text)
 
 
 def append_log_row(
@@ -333,7 +368,7 @@ def append_log_row(
     new_text = "\n".join(lines)
     if not new_text.endswith("\n"):
         new_text += "\n"
-    path.write_text(new_text, encoding="utf-8")
+    _atomic_write_text(path, new_text)
 
 
 # ---------------------------------------------------------------------------
@@ -489,8 +524,12 @@ def _build_card_md(
 def read_card_question(track_id: str, card_id: str, root: Path | None = None) -> str:
     """Extract the question text from a card file; '' if not found.
 
-    Supports the Obsidian spaced-repetition multi-line format (question lines
-    before a lone `?`/`??` separator) and the legacy `**Q:**` format.
+    Supports every Obsidian spaced-repetition card shape so the answer is never
+    leaked in the `due` listing:
+    - multi-line: question lines before a lone `?`/`??` separator (our own format)
+    - inline: `Question::Answer` / `Question:::Answer` -> text before `::`
+    - cloze:   a line with `==answer==` -> the line with cloze blanked to `[...]`
+    - legacy:  `**Q:**` prefix
     """
     path = cards_dir(track_id, root) / f"{card_id}.md"
     if not path.exists():
@@ -507,6 +546,14 @@ def read_card_question(track_id: str, card_id: str, root: Path | None = None) ->
         if not stripped or stripped.startswith("#"):
             continue  # skip blank lines and the #flashcards tag
         q_lines.append(stripped)
+
+    # No `?` separator found: try hand-authored inline / cloze forms on the
+    # first real content line (never return the answer side).
+    first = q_lines[0] if q_lines else ""
+    if "::" in first:
+        return first.split("::", 1)[0].strip()
+    if "==" in first:
+        return re.sub(r"==(.+?)==", "[...]", first).strip()
     # Legacy fallback for old `**Q:**` cards.
     m = re.search(r"\*\*Q:\*\*\s*(.+)", text)
     return m.group(1).strip() if m else " ".join(q_lines).strip()
@@ -596,17 +643,12 @@ def create_track(
 
     (tdir / "cards").mkdir(parents=True, exist_ok=True)
     (tdir / "notes").mkdir(parents=True, exist_ok=True)
-    track_md_path(track_id, root).write_text(
-        _build_track_md(meta, goal), encoding="utf-8"
-    )
-    (tdir / "plan.md").write_text(
-        f"# {title} — Map of Content\n\n_Wikilinks to cards go here._\n",
-        encoding="utf-8",
-    )
+    _atomic_write_text(track_md_path(track_id, root), _build_track_md(meta, goal))
+    _atomic_write_text(tdir / "plan.md", _plan_md_skeleton(title))
     # Scaffold a MISSION.md stub so the "ground every track in a why" discipline
     # (methods/learning-science.md) can't be silently skipped — the board flags it
     # as not-yet-filled until the stub marker is removed.
-    mission_path(track_id, root).write_text(_mission_stub(title), encoding="utf-8")
+    _atomic_write_text(mission_path(track_id, root), _mission_stub(title))
     save_review_state(track_id, {}, root)
 
     rebuild_registry(root)
@@ -929,8 +971,9 @@ def add_card(
     tags = tags or []
     card_id = next_card_id(track_id, root)
     cards_dir(track_id, root).mkdir(parents=True, exist_ok=True)
-    (cards_dir(track_id, root) / f"{card_id}.md").write_text(
-        _build_card_md(card_id, question, answer, tags, track_id), encoding="utf-8"
+    _atomic_write_text(
+        cards_dir(track_id, root) / f"{card_id}.md",
+        _build_card_md(card_id, question, answer, tags, track_id),
     )
     state = load_review_state(track_id, root, on_corrupt="raise")
     state[card_id] = _seed_new_card_state(today)
@@ -978,9 +1021,7 @@ def add_cards(
             tags = card.get("tags") or []
             card_id = f"card-{start + i:04d}"
             path = cdir / f"{card_id}.md"
-            path.write_text(
-                _build_card_md(card_id, q, a, list(tags), track_id), encoding="utf-8"
-            )
+            _atomic_write_text(path, _build_card_md(card_id, q, a, list(tags), track_id))
             written.append(path)
             state[card_id] = _seed_new_card_state(today)
             new_ids.append(card_id)

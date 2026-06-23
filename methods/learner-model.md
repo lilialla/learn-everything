@@ -40,6 +40,10 @@ Do **not** print this analysis — it conditions your reply, it is not the reply
 | Overwhelmed / high load | Shrink the step, drop jargon, give one worked example, slow down. |
 | Bored | Increase challenge or connect to something they care about; don't re-explain what they have. Up-shift move: **pose an L3 transfer task** — a novel case where the simple model predicts wrong; ask what actually happens. |
 
+For the `solid` / `bored` / `over-confident` rows, load **`methods/elaboration.md`** — the
+up-shift pedagogy (transfer tasks, find-the-break, elaborative interrogation, compression,
+interleaving), the mirror of how tutor/socratic catch the struggling learner.
+
 ## Updating the model
 
 Treat each learner turn as evidence that *revises* your estimate — don't anchor on a first
