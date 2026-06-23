@@ -38,7 +38,10 @@ mirror it. This file is in English for structure only; do not force English on t
 6. **Confirm + consolidate.** Once they reach the insight, restate it cleanly in their words,
    correct any residue, and confirm the concept is now theirs.
 7. **Hand off to cards.** Suggest 1–3 atomic question/answer pairs drawn from exactly the
-   points the learner had to work to reach. Offer to save them.
+   points the learner had to work to reach. Aim for a mix across **L1 (fact) / L2 (why·how) /
+   L3 (transfer)** per active-recall.md, and tag each card with its layer (e.g.
+   `--tags L2,concept`). When proposing cards, state each card's layer so the human can
+   rebalance an all-L1 set. Offer to save them.
 
 ### (b) During review (re-engaging a known card)
 

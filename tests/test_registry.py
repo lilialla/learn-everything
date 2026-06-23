@@ -195,6 +195,76 @@ class RegistryTestCase(unittest.TestCase):
         old_rec = next(t for t in board2["tracks"] if t["id"] == "old")
         self.assertTrue(old_rec["stale"])
 
+    def test_status_board_row_carries_actionable_fields(self):
+        self._make_track(pedagogy="tutor")
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        registry.log_entry(
+            "python", "Studied", next_action="Do exercises",
+            today=self.today, root=self.root,
+        )
+        board = registry.status_board(self.today, self.root)
+        rec = board["tracks"][0]
+        # Fields that make the board a "do this next", not just a list.
+        self.assertEqual(rec["mode"], "domain")
+        self.assertEqual(rec["pedagogy"], "tutor")
+        self.assertEqual(rec["cards_total"], 1)
+        self.assertEqual(rec["next_action"], "Do exercises")
+        self.assertEqual(rec["last_active"], self.today)
+        self.assertIn("stale_days", rec)
+
+    def test_status_board_orders_due_and_deadline_first(self):
+        # 'fresh' has no cards, no deadline. 'urgent' has a near deadline.
+        # 'reviewy' has cards due today. Order should be urgent, reviewy, fresh.
+        self._make_track("fresh", title="Fresh")
+        self._make_track("urgent", title="Urgent",
+                         deadline=_iso(date(2026, 6, 23)))
+        self._make_track("reviewy", title="Reviewy")
+        registry.add_card("reviewy", "Q", "A", today=self.today, root=self.root)
+        board = registry.status_board(self.today, self.root)
+        ids = [t["id"] for t in board["tracks"]]
+        self.assertEqual(ids[0], "urgent")  # deadline < 3 days
+        self.assertEqual(ids[1], "reviewy")  # cards due today
+        self.assertEqual(ids[2], "fresh")
+
+    def test_corrupt_review_state_raises_on_grade(self):
+        self._make_track()
+        registry.add_card("python", "Q1", "A1", today=self.today, root=self.root)
+        registry.add_card("python", "Q2", "A2", today=self.today, root=self.root)
+        rs_path = self.root / "tracks" / "python" / "review-state.json"
+        rs_path.write_text("{ corrupt", encoding="utf-8")
+        # Grading must abort rather than silently zero the other card's state.
+        with self.assertRaises(ValueError):
+            registry.grade_card(
+                "python", "card-0001", 3, today=self.today, root=self.root,
+                scheduler=lambda *a: {"due": self.tomorrow},
+            )
+        # Corrupt file quarantined; no fresh review-state.json clobbering it.
+        bad = list((self.root / "tracks" / "python").glob("review-state.json.bad.*"))
+        self.assertEqual(len(bad), 1)
+
+    def test_malformed_card_entry_does_not_crash_status(self):
+        self._make_track()
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        rs_path = self.root / "tracks" / "python" / "review-state.json"
+        # A non-dict per-card entry (e.g. hand-edit gone wrong).
+        rs_path.write_text(
+            json.dumps({"card-0001": "oops"}), encoding="utf-8"
+        )
+        board = registry.status_board(self.today, self.root)
+        # Treated as new -> due now, no AttributeError crash.
+        self.assertEqual(board["tracks"][0]["cards_due_today"], 1)
+
+    def test_unknown_frontmatter_key_survives_log(self):
+        self._make_track()
+        registry.update_track_meta(
+            "python", {"custom_field": "keep me"}, root=self.root
+        )
+        registry.log_entry(
+            "python", "did stuff", today=self.today, root=self.root
+        )
+        meta = registry.read_track("python", self.root)
+        self.assertEqual(meta["custom_field"], "keep me")
+
     def test_grade_with_injected_scheduler_writes_state(self):
         self._make_track()
         registry.add_card("python", "Q", "A", today=self.today, root=self.root)

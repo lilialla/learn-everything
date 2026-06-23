@@ -94,6 +94,10 @@ def _scalar_to_yaml(value) -> str:
     if value is None:
         return "null"
     text = str(value)
+    # Collapse newlines to spaces: a multi-line scalar would otherwise break the
+    # single-line `key: value` frontmatter (and inject a bogus key-less line into
+    # the `---` block). Mirrors the Log-cell behavior in append_log_row.
+    text = text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
     if text == "":
         return '""'
     # Quote if it could be misread (contains a colon followed by space, leading
@@ -124,11 +128,18 @@ def _scalar_from_yaml(raw: str):
 
 
 def emit_frontmatter(meta: dict) -> str:
-    """Build the `--- ... ---` YAML block from a metadata dict."""
+    """Build the `--- ... ---` YAML block from a metadata dict.
+
+    Known keys are emitted first in FRONTMATTER_KEYS order; any extra keys the
+    user added to TRACK.md are then appended (sorted) so they survive a round-trip
+    through log/grade — TRACK.md is the source of truth, not just the schema.
+    """
     lines = ["---"]
     for key in FRONTMATTER_KEYS:
         if key in meta:
             lines.append(f"{key}: {_scalar_to_yaml(meta[key])}")
+    for key in sorted(k for k in meta if k not in FRONTMATTER_KEYS):
+        lines.append(f"{key}: {_scalar_to_yaml(meta[key])}")
     lines.append("---")
     return "\n".join(lines)
 
@@ -285,8 +296,19 @@ def append_log_row(
 # Review-state (FSRS sidecar)
 # ---------------------------------------------------------------------------
 
-def load_review_state(track_id: str, root: Path | None = None) -> dict:
-    """Load review-state.json. Missing/corrupt -> {} with a warning."""
+def load_review_state(
+    track_id: str, root: Path | None = None, on_corrupt: str = "lenient"
+) -> dict:
+    """Load review-state.json.
+
+    `on_corrupt='lenient'` (read-only callers: due/status): missing/corrupt -> {}
+    with a warning, treating cards as new — safe because nothing is written back.
+
+    `on_corrupt='raise'` (write callers: grade/add-card): a corrupt file aborts the
+    mutation instead of overwriting it, which would silently zero every OTHER card's
+    FSRS state. The bad file is renamed to review-state.json.bad.<ts> so the operator
+    can recover it, then a ValueError is raised.
+    """
     path = review_state_path(track_id, root)
     if not path.exists():
         return {}
@@ -296,6 +318,25 @@ def load_review_state(track_id: str, root: Path | None = None) -> dict:
             raise ValueError("review-state.json is not a JSON object")
         return data
     except (json.JSONDecodeError, ValueError, OSError) as exc:
+        if on_corrupt == "raise":
+            ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+            bad_path = path.with_name(f"{path.name}.bad.{ts}")
+            try:
+                path.rename(bad_path)
+                _warn(
+                    f"review-state.json for track '{track_id}' is corrupt ({exc}); "
+                    f"moved to {bad_path.name} and aborting the write to avoid "
+                    f"clobbering other cards' FSRS state"
+                )
+            except OSError as rename_exc:
+                _warn(
+                    f"review-state.json for track '{track_id}' is corrupt ({exc}) "
+                    f"and could not be quarantined ({rename_exc})"
+                )
+            raise ValueError(
+                f"review-state.json for track '{track_id}' is corrupt; refusing "
+                f"to overwrite it"
+            ) from exc
         _warn(
             f"review-state.json for track '{track_id}' is missing/corrupt "
             f"({exc}); treating its cards as new"
@@ -574,8 +615,8 @@ def _cards_due_today(track_id: str, today: str, root: Path | None = None) -> int
     count = 0
     for card_id in list_card_ids(track_id, root):
         entry = state.get(card_id)
-        if entry is None:
-            # Unseeded card behaves as new -> due now.
+        if not isinstance(entry, dict):
+            # Unseeded or malformed entry behaves as new -> due now.
             count += 1
             continue
         due = entry.get("due")
@@ -611,12 +652,31 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
             {
                 "id": track_id,
                 "title": rec.get("title"),
+                "mode": rec.get("mode"),
+                "pedagogy": rec.get("pedagogy"),
                 "status": rec.get("status"),
                 "days_to_deadline": days_to_deadline,
                 "cards_due_today": _cards_due_today(track_id, today, root),
+                "cards_total": rec.get("cards_total"),
+                "last_active": last_active,
+                "stale_days": stale_days,
                 "stale": stale,
+                "next_action": rec.get("next_action"),
             }
         )
+    # Deterministic "do this next" ordering (bridge until plan-day ships):
+    # 1) deadline within 3 days, 2) most cards due today, 3) stale before fresh,
+    # 4) id as a stable tiebreaker.
+    board.sort(
+        key=lambda t: (
+            0
+            if (t["days_to_deadline"] is not None and t["days_to_deadline"] < 3)
+            else 1,
+            -(t["cards_due_today"] or 0),
+            0 if t["stale"] else 1,
+            t["id"],
+        )
+    )
     return {"today": today, "tracks": board}
 
 
@@ -638,7 +698,7 @@ def add_card(
     (cards_dir(track_id, root) / f"{card_id}.md").write_text(
         _build_card_md(card_id, question, answer, tags, track_id), encoding="utf-8"
     )
-    state = load_review_state(track_id, root)
+    state = load_review_state(track_id, root, on_corrupt="raise")
     state[card_id] = _seed_new_card_state(today)
     save_review_state(track_id, state, root)
     return card_id
@@ -663,7 +723,8 @@ def due_cards(
         state = load_review_state(track_id, root)
         for card_id in list_card_ids(track_id, root):
             entry = state.get(card_id)
-            due = entry.get("due") if entry else today  # unseeded -> due now
+            # unseeded or malformed -> due now
+            due = entry.get("due") if isinstance(entry, dict) else today
             if due is None or _due_le(due, today):
                 result.append(
                     {
@@ -696,8 +757,10 @@ def grade_card(
         raise ValueError(f"unknown card '{card_id}' in track '{track_id}'")
 
     today = _today_str(today)
-    state = load_review_state(track_id, root)
+    state = load_review_state(track_id, root, on_corrupt="raise")
     prior = state.get(card_id)
+    if not isinstance(prior, dict):
+        prior = None  # malformed entry -> treat as new
     # A brand-new (or unseeded) card has no prior FSRS state.
     prior_for_fsrs = None if (prior is None or prior.get("state") == "new") else prior
 

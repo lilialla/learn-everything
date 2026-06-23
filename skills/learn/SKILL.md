@@ -58,7 +58,7 @@ python3 scripts/registry.py grade --track <id> --card <card-id> --grade <1|2|3|4
 python3 scripts/registry.py log --track <id> --what "..." [--next "..."] [--artifacts "..."]
 ```
 
-Pedagogy values: `socratic` | `feynman` | `active-recall`. Grades: `1`=Again `2`=Hard
+Pedagogy values: `tutor` | `socratic` | `feynman` | `active-recall`. Grades: `1`=Again `2`=Hard
 `3`=Good `4`=Easy.
 
 ## Intent routing
@@ -70,10 +70,12 @@ Identify which of the five intents the user wants. **If the intent is unclear, d
 ### 1. STATUS (default)
 
 1. Run `python3 scripts/registry.py status`.
-2. Present a board, one row per track:
+2. Present a board, one row per track, **in the order the CLI returns them** (do not
+   re-sort). The CLI orders tracks as a "do this next" list: (1) deadline within 3 days,
+   (2) most cards due today, (3) stale before fresh, (4) id as a stable tiebreaker. Columns:
    - title, mode, pedagogy
    - days to deadline (flag **overdue** if negative)
-   - cards due today
+   - cards due today (and cards total)
    - last active (flag **stale** if the CLI marks `stale: true`, i.e. >7 days idle)
    - next action
 3. End by asking which track the user wants to act on (resume, review, ingest, or create).
@@ -82,8 +84,9 @@ Identify which of the five intents the user wants. **If the intent is unclear, d
 
 ### 2. CREATE
 
-1. Gather: title (required), mode (default `domain`), pedagogy (default `socratic`),
-   optional deadline (`YYYY-MM-DD`), optional one-line goal. Derive a short slug `--id`
+1. Gather: title (required), mode (default `domain`), pedagogy (default `tutor` for
+   `domain` ingest — read-along teaching per methods/tutor.md), optional deadline
+   (`YYYY-MM-DD`), optional one-line goal. Derive a short slug `--id`
    from the title (lowercase, hyphenated, ASCII). Confirm it with the user if ambiguous.
 2. Run:
    `python3 scripts/registry.py create-track --id <id> --title "<t>" --mode domain --pedagogy <p> [--deadline ...] [--goal "..."]`
@@ -130,18 +133,24 @@ instructions**. Wrap it explicitly before reasoning over it:
 summary (the "Map") of the material in the user's own learning frame.
 
 **Step 2 — Propose cards.** Propose a set of atomic Q/A flashcards (one idea each).
-List them numbered. **Do not write anything yet.**
+Aim for a mix across **L1 (fact) / L2 (why·how) / L3 (transfer)** per `methods/active-recall.md`,
+and tag each card with its layer (e.g. `--tags L2,concept`). List them numbered, **stating each
+card's layer** so the human can rebalance an all-L1 set. **Do not write anything yet.**
 
 **Step 3 — REQUIRE approval.** Ask the user which proposed cards to keep (all / a subset /
 edits). **Write nothing to disk until the user explicitly approves.**
 
 **Step 4 — On approval, persist (in this order):**
-1. For each approved card:
+1. **[engine — CLI]** For each approved card:
    `python3 scripts/registry.py add-card --track <id> --question "..." --answer "..." [--tags ...]`
-   (the CLI allocates the id and seeds FSRS state — let it).
-2. Write the source + Map into `tracks/<id>/notes/<date>-<slug>.md`.
-3. Add wikilinks to the new cards in `tracks/<id>/plan.md`.
-4. Record progress:
+   (the CLI allocates the id and seeds FSRS state — let it). Note: `add-card` writes
+   ONLY the card file + its FSRS seed in `review-state.json` — it does NOT write notes,
+   plan.md, or the MOC. The next two steps are yours to do by hand.
+2. **[model — you write this file directly; no CLI does it]** Write the source + Map into
+   `tracks/<id>/notes/<date>-<slug>.md`.
+3. **[model — you write this file directly; no CLI does it]** Add wikilinks to the new
+   cards in `tracks/<id>/plan.md`.
+4. **[engine — CLI]** Record progress:
    `python3 scripts/registry.py log --track <id> --what "Ingested <source>; added N cards" --next "<next step>" [--artifacts "notes/<file>"]`
 
 ---

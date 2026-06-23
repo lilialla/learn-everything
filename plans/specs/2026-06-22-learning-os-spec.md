@@ -9,8 +9,10 @@
 >
 > **Three orthogonal axes** (the design skeleton):
 > - **Mode** — what kind of track: `domain` / `exam` / `applied`. Picks the workflow.
-> - **Pedagogy** — how the AI teaches/interrogates: `socratic` / `feynman` / `active-recall` /
->   `worked-example`. Executed by the host model from method prompts.
+> - **Pedagogy** — how the AI teaches/interrogates: `tutor` (read-along teaching, the `domain`
+>   ingest default) / `socratic` / `feynman` / `active-recall`. Executed by the host model from
+>   method prompts. (`worked-example` is a planned-but-unbuilt addition — a future `methods/*.md`,
+>   not part of MVP.)
 > - **Engine** — the deterministic part: FSRS scheduling, state files, status board. Pure scripts,
 >   model-independent — never improvised by the LLM.
 >
@@ -104,8 +106,8 @@ MVP ships the spine + one mode + pedagogy + the shared engine:
 - **Pedagogy (first-class, not deferred)** = the `domain` track and review support
   `feynman` (user explains back, host model judges + probes gaps), `socratic` (host model leads
   with questions instead of exposition), and `active-recall` (plain recall quiz — the natural
-  partner of FSRS). Selectable per track (`pedagogy:` in TRACK.md); default `socratic` for ingest,
-  `active-recall` for review. Other mainstream techniques (elaboration, worked-example, interleaving)
+  partner of FSRS), plus `tutor` (read-along teaching). Selectable per track (`pedagogy:` in
+  TRACK.md); default `tutor` for `domain` ingest, `active-recall` for review. Other mainstream techniques (elaboration, worked-example, interleaving)
   are just additional `methods/*.md` files — addable anytime with zero engine change, so they stay
   out of MVP scope without closing the door.
 - **Shared engine** = FSRS-6 spaced repetition in stdlib Python (no pip deps), used by
@@ -137,7 +139,7 @@ split + MCP seam so other hosts slot in later — both without rework.
      non-archived track: title, mode, pedagogy, status, days-to-deadline, # cards due today,
      last-active, next action. Rebuilds from `TRACK.md` files if `registry.json` is missing/stale;
      flags overdue deadlines and stale tracks (no activity > N days). Backed by `scripts/registry.py`.
-   - **create** — new track: ask `mode` (default `domain`), `pedagogy` (default `socratic`), title,
+   - **create** — new track: ask `mode` (default `domain`), `pedagogy` (default `tutor`), title,
      optional deadline; scaffold the track folder + `TRACK.md`; register.
    - **resume** — existing track: read `TRACK.md`, show `next_action`, continue in its mode/pedagogy.
    - **ingest (domain loop)** — take one source (pasted text / file path / URL via the web-access
@@ -202,7 +204,7 @@ polylearn/                      # open-source repo (this product)
 id: share-swap-restructuring
 title: 换股重组
 mode: domain            # domain | exam | applied (only domain in MVP)
-pedagogy: socratic      # socratic | feynman | active-recall (host model executes this)
+pedagogy: tutor         # tutor | socratic | feynman | active-recall (host model executes this)
 status: active          # active | paused | done | archived
 created: 2026-06-22
 deadline: null          # ISO date or null

@@ -41,8 +41,11 @@ in understanding — and a future flashcard.
 1. Show the card's question; ask the learner to **explain the answer in plain language**,
    not just name it.
 2. Run a single pass of the gap-probe loop on their explanation.
-3. Reveal/confirm; then self-grade per the 1–4 rubric (see active-recall.md). A clean
-   plain-language explanation = Good/Easy; jargon-leaning or shaky = Hard/Again.
+3. Reveal/confirm; then self-grade per the active-recall 1–4 rubric, which is the single
+   grading authority (see active-recall.md): grade by **retrieval difficulty by feel**, not
+   by explanation polish. Use explanation cleanliness only as corroborating evidence — a
+   clean teach-back that still required heavy effort to produce is a Hard, not an Easy. This
+   keeps the grade consistent with active-recall, since both feed the same FSRS scheduler.
 
 ## Gap-probe loop
 
@@ -69,6 +72,9 @@ When the explanation is clean, propose atomic cards — one fact/relationship ea
 - **Q:** targets the precise point that was a gap. **A:** the clean form the learner reached.
 - Keep cards atomic (one idea), answerable from memory, and phrased in the learner's own
   framing where possible.
+- Aim for a mix across **L1 (fact) / L2 (why·how) / L3 (transfer)** per active-recall.md, and
+  tag each card with its layer (e.g. `--tags L2,concept`). When proposing cards for approval,
+  state each card's layer so the human can rebalance an all-L1 set.
 - Tag cards with the concept name so they group in the track.
 
 ## Anti-patterns
