@@ -151,6 +151,13 @@ stderr——它绝不丢失真实来源，也绝不让整次运行崩溃。
 - **Obsidian 配套**——基础的一体化用法现在就能用（见上文「在 Obsidian 里用」）；更深的配套
   （在 Obsidian 内显示到期卡片数 / `next_action`、FSRS 状态双向同步）是自然的下一步。
 
+## 致谢
+
+- `methods/learning-science.md` 的教学法改编自 [Matt Pocock 的 `teach` skill](https://github.com/mattpocock/skills)
+  （MIT，© 2026 Matt Pocock）——按 learn-everything 的 track/card/FSRS 模型重写。
+- FSRS 排程遵循 [open-spaced-repetition/py-fsrs](https://github.com/open-spaced-repetition/py-fsrs)
+  （FSRS-6）；卡片兼容 [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition)。
+
 ## 许可证
 
 MIT——见 [LICENSE](LICENSE)。

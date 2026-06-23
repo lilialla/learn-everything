@@ -169,6 +169,13 @@ constants.
   Obsidian* above); a deeper companion (due-card counts / `next_action` surfaced inside
   Obsidian, two-way FSRS state sync) is the natural next step.
 
+## Credits
+
+- `methods/learning-science.md` adapts pedagogy from the [`teach` skill by Matt Pocock](https://github.com/mattpocock/skills)
+  (MIT, © 2026 Matt Pocock) — reframed for learn-everything's track/card/FSRS model.
+- FSRS scheduling follows [open-spaced-repetition/py-fsrs](https://github.com/open-spaced-repetition/py-fsrs)
+  (FSRS-6); cards are compatible with [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

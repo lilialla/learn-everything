@@ -39,6 +39,11 @@ out to the fixed CLI contract below, and (3) run the right pedagogy loop from `m
   (read-along teaching — the default for `domain` learning), `socratic`, `feynman`,
   `active-recall` (the REVIEW default). Load the track's `pedagogy:` file; for REVIEW use
   `active-recall` unless the card keeps failing (then switch to `socratic`/`feynman` to re-teach).
+- **Also compose `methods/learning-science.md`** (the cross-cutting "why"): ground each track in a
+  `MISSION.md` (the real-world why; interview if vague), aim for storage strength via desirable
+  difficulty, keep teaching inside the zone of proximal development, never trust parametric knowledge
+  for facts (cite trusted sources), and maintain the track's optional `glossary.md` +
+  `learning-records/` as understanding deepens. These are plain markdown in the track folder.
 
 ## The CLI contract (the only way to touch state)
 
