@@ -143,6 +143,11 @@ worked examples then practice (`methods/worked-examples.md` / `deliberate-practi
 else fall back to tutor + active-recall); learner already solid/bored → push with transfer/edge
 cases (`elaboration`); a concept that keeps failing in review → re-teach via questioning
 (`socratic`/`feynman`). Default to read-along only for knowledge — don't use it for everything.
+Two cross-cutting layers to fold in (not standalone modes): `methods/dual-coding.md` — when
+explaining, pair words with a quick visual (ASCII/mermaid/table) and a concrete example beside
+the abstraction, and interleave sub-topics in review; `methods/metacognition.md` — have the
+learner predict before you reveal, and self-review at session end (this is also what the
+"rate how it felt" review grade is doing).
 
 ## Flow: "pick up where we left off"
 
