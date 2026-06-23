@@ -1,5 +1,13 @@
 # learn-everything — Feature Designs
 
+> 🧊 **FROZEN (2026-06-24) — do not build these yet.** Per the architecture optimization plan
+> ([`docs/2026-06-24-architecture-optimization-plan.md`](../../docs/2026-06-24-architecture-optimization-plan.md)),
+> the entire deferred backlog below (exam mode, applied mode, URL ingestion, long-document
+> ingestion, personalized FSRS weights) is **blocked until the core retention loop is demonstrably
+> sticky for one user on one track: ≥10 cards and ≥3 review days.** Building breadth against an
+> empty deck is the main maturity risk. Stock FSRS-6 defaults stay; revisit personalized weights
+> only after >200 graded reviews.
+
 > These are the **detailed feature designs** for the roadmap items and Open Items of the main
 > spec, [`2026-06-22-learning-os-spec.md`](./2026-06-22-learning-os-spec.md). The MVP (spine +
 > `domain` mode + shared FSRS engine, the single `learn` skill, `methods/*.md`) has shipped; this

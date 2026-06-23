@@ -15,12 +15,14 @@ to LLM/agent engineering."
 What you're trying to achieve overall (not per-track — tracks carry their own goals).
 Example: "Build working intuition for agent architectures; pass IELTS at band 7.5."
 
-## Preferred pedagogy
+## Preferred teaching style
 
-Your default teaching style when a track doesn't specify one.
-Options: `socratic` (led by questions), `feynman` (you explain back, model probes gaps),
-`active-recall` (plain recall quizzing).
-Example: "Default socratic for new material, active-recall for review."
+How you like to be taught, in plain words:
+- **teach me** — walk me through it step by step
+- **quiz me** — test my recall
+- **I explain it back** — I say it in my own words and you catch the gaps
+
+Example: "Teach me new things, then quiz me to make them stick."
 
 ## Languages
 

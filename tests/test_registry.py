@@ -519,5 +519,57 @@ class RegistryTestCase(unittest.TestCase):
         self.assertTrue(r2["mission_present"])
 
 
+    # -- P0 Group A: close-the-loop signals ------------------------------
+
+    def test_session_check_requires_card_or_reason(self):
+        self._make_track()
+        self.assertFalse(registry.session_check("python", self.root)["ok"])
+        # a logged reason makes a no-card session legitimate
+        registry.log_entry(
+            "python", "orientation pass",
+            no_cards_reason="first read-through, cards next time",
+            today=self.today, root=self.root,
+        )
+        self.assertTrue(registry.session_check("python", self.root)["ok"])
+        # a track with a card passes without any reason
+        self._make_track("rust", title="Rust")
+        registry.add_card("rust", "Q", "A", today=self.today, root=self.root)
+        self.assertTrue(registry.session_check("rust", self.root)["ok"])
+
+    def test_status_due_total_and_resume_pointer_missing(self):
+        # taught earlier, active later, but no next_action and no Log row -> pointer missing
+        old = _iso(date(2026, 6, 12))
+        self._make_track("ghost", today=old)
+        registry.update_track_meta("ghost", {"last_active": self.today}, root=self.root)
+        board = registry.status_board(self.today, self.root)
+        ghost = next(t for t in board["tracks"] if t["id"] == "ghost")
+        self.assertTrue(ghost["resume_pointer_missing"])
+        # due_total / tracks_with_due reflect due cards
+        self._make_track("py2", title="Py2")
+        registry.add_card("py2", "Q", "A", today=self.today, root=self.root)
+        board2 = registry.status_board(self.tomorrow, self.root)
+        self.assertGreaterEqual(board2["due_total"], 1)
+        self.assertGreaterEqual(board2["tracks_with_due"], 1)
+
+    def test_progress_three_numbers(self):
+        self._make_track()
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+
+        def sched(state, grade, now):
+            return {
+                "stability": 50.0, "difficulty": 5.0, "due": _iso(date(2026, 8, 1)),
+                "reps": 1, "lapses": 0, "last_review": now, "state": "review",
+            }
+
+        registry.grade_card(
+            "python", "card-0001", 4, today=self.today, root=self.root, scheduler=sched
+        )
+        p = registry.progress("python", self.today, self.root)["tracks"][0]
+        self.assertEqual(p["cards_total"], 1)
+        self.assertEqual(p["cards_graduated"], 1)  # 2026-08-01 − 2026-06-22 > 21d
+        self.assertEqual(p["reviews_7d"], 1)
+        self.assertEqual(p["accuracy_7d"], 1.0)
+
+
 if __name__ == "__main__":
     unittest.main()

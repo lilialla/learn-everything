@@ -34,53 +34,55 @@ the host model performs the pedagogy by following the method layer; the engine o
 the deterministic scaffolding. An MCP server and other-host adapters are future work — the
 core's surface is designed so they slot in without a rewrite.
 
-## Quick start
+## Quick start (just talk to it in Obsidian)
 
-learn-everything works with **Claude Code** out of the box — point it at the `learn` skill.
+The intended way to use learn-everything is **inside Obsidian, in plain language** — you never
+touch a command line.
+
+**Day 1 — one-time setup (~10 min):**
+
+1. **Get the files:** `git clone <your-fork-url> learn-everything`.
+2. **Open it in Obsidian:** *Open folder as vault* → pick the `learn-everything` folder.
+3. **Add the [Claudian](https://github.com/YishenTu/claudian) plugin** (Community plugins →
+   search "Claudian" → Install → Enable). It puts an AI tutor in the right sidebar that can read
+   and write your vault.
+4. **(macOS) If Claudian shows a 401 / auth error:** its bundled Claude needs a credential. Run
+   `claude setup-token` in a terminal and paste the token into Claudian's settings as
+   `CLAUDE_CODE_OAUTH_TOKEN`. (If you use Claude Code's subscription login, you can instead copy
+   your keychain credential to `~/.claude/.credentials.json`.)
+5. **(optional) Native review:** add [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition)
+   so the cards the tutor makes are also reviewable inside Obsidian.
+
+**Then just talk to the tutor in the right sidebar** — no commands to remember:
+
+- *"I want to learn &lt;topic&gt;"* / *"teach me this article"* (paste or open it)
+- *"pick up where we left off"*
+- *"quiz me"* · *"what should I do today?"* · *"how am I doing?"*
+
+It teaches you one concept at a time, writes your notes into the vault as you go, and schedules
+reviews so things actually stick.
+
+**Coming back later:** open the vault and ask *"what should I do today?"* — it leads with how many
+cards are due across everything. (Want a reminder without opening it? Put this one line in a Daily
+Note or a scheduled task to print your due count — no background daemon:
+`python3 scripts/registry.py status`.)
+
+<details>
+<summary><b>Advanced — drive the engine directly (you normally never need this)</b></summary>
+
+The tutor runs these for you, but every action is a plain stdlib CLI:
 
 ```bash
-# 1. Clone
-git clone <your-fork-url> learn-everything
-cd learn-everything
-
-# 2. Use it from Claude Code by invoking the skill at skills/learn/
-#    (in a Claude Code session, just ask to "start a learning track" / "review what's due")
-
-# 3. Create a track
-python3 scripts/registry.py create-track \
-  --id llm-agents --title "LLM & Agents" --mode domain --pedagogy socratic \
-  --goal "Understand modern agent architectures"
-
-# 4. Ingest a source (the host model proposes cards; you approve; cards get written)
-#    Then add an approved card:
-python3 scripts/registry.py add-card --track llm-agents \
-  --question "What does FSRS schedule?" --answer "The next review date per card." --tags fsrs
-
-# 5. Review what's due, then grade
+python3 scripts/registry.py status                         # board + how many cards are due today
+python3 scripts/registry.py create-track --id llm --title "LLM & Agents" --mode domain --pedagogy tutor --goal "..."
+echo '[{"question":"...","answer":"..."}]' | python3 scripts/registry.py add-cards --track llm
 python3 scripts/registry.py due --track all
-python3 scripts/registry.py grade --track llm-agents --card card-0001 --grade 3
+python3 scripts/registry.py grade --track llm --card card-0001 --grade 3
+python3 scripts/registry.py progress --track llm           # total / graduated / 7-day accuracy
 ```
 
-Everything is plain files you can read, edit, and version yourself.
-
-## Use it inside Obsidian (one app)
-
-learn-everything's folder is a valid Obsidian vault (markdown + frontmatter + `[[wikilinks]]`
-+ a per-track `plan.md` map-of-content), so you can run the whole loop in a single window:
-
-1. **Open the repo as a vault** in Obsidian — source notes, cards, and `plan.md` render on the left.
-2. **Add [Claudian](https://github.com/YishenTu/claudian)** (MIT): it embeds Claude Code as a
-   sidebar with the vault as its working directory. That sidebar is your tutor — read on the
-   left, ask on the right, notes grow live in `tracks/<id>/notes/`.
-3. **Add [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition)**
-   (MIT): cards written by `add-card` use its `#flashcards/<track>` + `?`-separator format, so
-   they review natively in Obsidian. learn-everything's FSRS engine stays the authoritative
-   scheduler (state in `review-state.json`).
-
-> ⚠️ **Verify once on your machine:** the in-Obsidian path needs Claudian's embedded Claude
-> Code to run the Python engine via Bash. Expected to work but unverified — test with
-> `python3 scripts/fsrs.py schedule --state '-' --grade 3 --now 2026-06-22`. If script
-> execution is blocked, run Claude Code in a terminal beside Obsidian (same folder) instead.
+Everything is plain files under `tracks/` you can read, edit, and version yourself.
+</details>
 
 ## Data model
 

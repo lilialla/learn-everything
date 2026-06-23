@@ -19,7 +19,7 @@ import os
 import re
 import sys
 import tempfile
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -282,6 +282,32 @@ def read_track(track_id: str, root: Path | None = None) -> dict:
     path = track_md_path(track_id, root)
     text = path.read_text(encoding="utf-8")
     return parse_frontmatter(text)
+
+
+def log_row_count(track_id: str, root: Path | None = None) -> int:
+    """Count data rows in the '## Log' table (excludes header + separator)."""
+    path = track_md_path(track_id, root)
+    if not path.exists():
+        return 0
+    lines = path.read_text(encoding="utf-8").splitlines()
+    in_log = False
+    seen_sep = False
+    n = 0
+    for line in lines:
+        s = line.strip()
+        if s.lower() == "## log":
+            in_log = True
+            continue
+        if not in_log:
+            continue
+        if s.startswith("## "):  # next section ends the Log block
+            break
+        if s.startswith("|") and set(s) <= set("|-: "):
+            seen_sep = True
+            continue
+        if seen_sep and s.startswith("|"):
+            n += 1
+    return n
 
 
 def _split_track_md(text: str) -> tuple[list[str], list[str]]:
@@ -771,6 +797,13 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
         needs_cards = bool(
             rec.get("status") == "active" and cards_total == 0 and taught_since_created
         )
+        # A track that's been taught but has no way to resume (no next step, no log):
+        # exactly the failure where RESUME returns a blank pointer.
+        resume_pointer_missing = bool(
+            taught_since_created
+            and not rec.get("next_action")
+            and log_row_count(track_id, root) == 0
+        )
         board.append(
             {
                 "id": track_id,
@@ -785,6 +818,7 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
                 "stale_days": stale_days,
                 "stale": stale,
                 "needs_cards": needs_cards,
+                "resume_pointer_missing": resume_pointer_missing,
                 "mission_present": mission_present(track_id, root),
                 "next_action": rec.get("next_action"),
                 "goal_weight": rec.get("goal_weight"),
@@ -804,7 +838,14 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
             t["id"],
         )
     )
-    return {"today": today, "tracks": board}
+    due_total = sum((t["cards_due_today"] or 0) for t in board)
+    tracks_with_due = sum(1 for t in board if (t["cards_due_today"] or 0) > 0)
+    return {
+        "today": today,
+        "due_total": due_total,
+        "tracks_with_due": tracks_with_due,
+        "tracks": board,
+    }
 
 
 def _num(value, default: float) -> float:
@@ -1131,24 +1172,138 @@ def grade_card(
     return new_state["due"]
 
 
+NO_CARDS_MARKER = "no-cards-reason:"
+
+
 def log_entry(
     track_id: str,
     what: str,
     next_action: str | None = None,
     artifacts: str = "",
     today: str | None = None,
+    no_cards_reason: str | None = None,
     root: Path | None = None,
 ) -> None:
-    """Append a Log row, bump last_active/next_action, rebuild registry."""
+    """Append a Log row, bump last_active/next_action, rebuild registry.
+
+    `no_cards_reason` records the allowed "taught but made no card (yet)" state so
+    session-check can tell a deliberate no-card session from a silently-dropped one.
+    """
     if not track_md_path(track_id, root).exists():
         raise ValueError(f"unknown track '{track_id}'")
     today = _today_str(today)
+    if no_cards_reason:
+        what = f"{what}  [{NO_CARDS_MARKER} {no_cards_reason.strip()}]"
     append_log_row(track_id, today, what, artifacts, root)
     updates = {"last_active": today}
     if next_action is not None:
         updates["next_action"] = next_action
     update_track_meta(track_id, updates, root)
     rebuild_registry(root)
+
+
+def session_check(track_id: str, root: Path | None = None) -> dict:
+    """Was a retention trace left? A track must have ≥1 card OR a logged reason why not.
+
+    This makes "teach-first" measurable without silent gaps: a teaching session may
+    legitimately end with no card, but only if it says why (`log --no-cards-reason`).
+    Read-only over existing artifacts (card files + TRACK.md Log).
+    """
+    if not track_md_path(track_id, root).exists():
+        raise ValueError(f"unknown track '{track_id}'")
+    cards = len(list_card_ids(track_id, root))
+    if cards > 0:
+        return {"ok": True, "cards_total": cards, "reason": f"{cards} card(s) on this track"}
+    text = track_md_path(track_id, root).read_text(encoding="utf-8")
+    if NO_CARDS_MARKER in text:
+        return {
+            "ok": True,
+            "cards_total": 0,
+            "reason": "no cards yet, but a reason was logged",
+        }
+    return {
+        "ok": False,
+        "cards_total": 0,
+        "reason": (
+            "this track has 0 cards and no logged reason — distill at least one card "
+            "from what was taught, or run `log --no-cards-reason \"<why>\"`"
+        ),
+    }
+
+
+def _read_review_log(track_id: str, root: Path | None = None) -> list[dict]:
+    path = review_log_path(track_id, root)
+    if not path.exists():
+        return []
+    out: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return out
+
+
+def progress(
+    track: str = "all", today: str | None = None, root: Path | None = None
+) -> dict:
+    """Three retention numbers per track — proof the system is working.
+
+    cards_total / cards_graduated (FSRS interval > 21 days) / 7-day review accuracy.
+    Pure read over card files + review-state.json + review-log.jsonl. No dashboard.
+    """
+    today = _today_str(today)
+    if track and track != "all":
+        if not track_md_path(track, root).exists():
+            raise ValueError(f"unknown track '{track}'")
+        track_ids = [track]
+    else:
+        track_ids = [rec["id"] for rec in rebuild_registry(root)["tracks"]]
+
+    cutoff = datetime.strptime(today, "%Y-%m-%d").date() - timedelta(days=7)
+    rows = []
+    for tid in track_ids:
+        state = load_review_state(tid, root)
+        cards_total = len(list_card_ids(tid, root))
+        graduated = 0
+        for entry in state.values():
+            if not isinstance(entry, dict):
+                continue
+            due, lr = entry.get("due"), entry.get("last_review")
+            if due and lr:
+                try:
+                    iv = (
+                        datetime.strptime(due, "%Y-%m-%d").date()
+                        - datetime.strptime(lr, "%Y-%m-%d").date()
+                    ).days
+                    if iv > 21:
+                        graduated += 1
+                except ValueError:
+                    pass
+        recent = []
+        for r in _read_review_log(tid, root):
+            d = r.get("date")
+            try:
+                if d and datetime.strptime(d, "%Y-%m-%d").date() >= cutoff:
+                    recent.append(r)
+            except ValueError:
+                pass
+        good = sum(
+            1 for r in recent if isinstance(r.get("grade"), int) and r["grade"] >= 3
+        )
+        rows.append(
+            {
+                "track": tid,
+                "cards_total": cards_total,
+                "cards_graduated": graduated,
+                "reviews_7d": len(recent),
+                "accuracy_7d": round(good / len(recent), 2) if recent else None,
+            }
+        )
+    return {"today": today, "tracks": rows}
 
 
 def ingest_check(track_id: str, root: Path | None = None) -> dict:
@@ -1222,6 +1377,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp.add_argument("--track", required=True)
 
+    sp = sub.add_parser(
+        "session-check", help="did this session leave a card or a logged reason?"
+    )
+    sp.add_argument("--track", required=True)
+
+    sp = sub.add_parser(
+        "progress", help="3 retention numbers per track (total / graduated / 7-day accuracy)"
+    )
+    sp.add_argument("--track", default="all")
+    sp.add_argument("--today", default=None)
+
     sp = sub.add_parser("add-card", help="add a card to a track")
     sp.add_argument("--track", required=True)
     sp.add_argument("--question", required=True)
@@ -1260,6 +1426,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--what", required=True)
     sp.add_argument("--next", dest="next_action", default=None)
     sp.add_argument("--artifacts", default="")
+    sp.add_argument(
+        "--no-cards-reason",
+        dest="no_cards_reason",
+        default=None,
+        help="record why a teaching session produced no card (passes session-check)",
+    )
 
     return p
 
@@ -1286,6 +1458,10 @@ def main(argv: list[str] | None = None) -> int:
             print(next_card_id(args.track))
         elif args.command == "ingest-check":
             _print_json(ingest_check(args.track))
+        elif args.command == "session-check":
+            _print_json(session_check(args.track))
+        elif args.command == "progress":
+            _print_json(progress(args.track, args.today))
         elif args.command == "add-card":
             tags = [t.strip() for t in args.tags.split(",") if t.strip()]
             print(
@@ -1317,6 +1493,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.what,
                 next_action=args.next_action,
                 artifacts=args.artifacts,
+                no_cards_reason=args.no_cards_reason,
             )
         else:  # pragma: no cover - argparse enforces choices
             print(f"unknown command: {args.command}", file=sys.stderr)
