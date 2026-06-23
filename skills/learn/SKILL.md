@@ -53,7 +53,9 @@ python3 scripts/registry.py create-track --id <id> --title <t> --mode domain --p
 python3 scripts/registry.py rebuild
 python3 scripts/registry.py next-card-id --track <id>
 python3 scripts/registry.py add-card --track <id> --question "..." --answer "..." [--tags a,b] [--today YYYY-MM-DD]
+echo '<json array>' | python3 scripts/registry.py add-cards --track <id> [--today YYYY-MM-DD]   # batch, all-or-nothing
 python3 scripts/registry.py due [--track <id|all>] [--today YYYY-MM-DD]
+python3 scripts/registry.py plan-day [--today YYYY-MM-DD] [--minutes N] [--energy low|normal|high]
 python3 scripts/registry.py grade --track <id> --card <card-id> --grade <1|2|3|4> [--today YYYY-MM-DD]
 python3 scripts/registry.py log --track <id> --what "..." [--next "..."] [--artifacts "..."]
 ```
@@ -78,7 +80,28 @@ Identify which of the five intents the user wants. **If the intent is unclear, d
    - cards due today (and cards total)
    - last active (flag **stale** if the CLI marks `stale: true`, i.e. >7 days idle)
    - next action
-3. End by asking which track the user wants to act on (resume, review, ingest, or create).
+3. **Surface the two nudges the CLI computes (don't fabricate them):**
+   - If a row has `needs_cards: true` (an active track that's had sessions but produced
+     **0 cards** — the retention net is off), gently offer to distill a few cards from it.
+   - If a row has `mission_present: false`, the track's `MISSION.md` is still a stub —
+     offer to fill in the "why" (it grounds every later session; see learning-science).
+4. End by asking which track to act on, or offer **PLAN-DAY** ("want a plan for today?").
+
+---
+
+### 1b. PLAN-DAY (what should I do today, across everything)
+
+When the user asks "what should I do today / what first / plan my day":
+
+1. Run `python3 scripts/registry.py plan-day [--minutes N] [--energy low|normal|high]`
+   (default 60 min, normal energy; ask only if the user volunteers a time budget/energy).
+2. The **engine has already ranked and time-boxed** the blocks. Present `scheduled[]`
+   **in the exact order given — do NOT reorder, merge, or invent blocks.** For each block
+   show: time-box (`est_min`), kind (review / new / re-anchor), track title, and why
+   (`reason_codes`). Mention the `deferred[]` list briefly so the user sees what didn't fit.
+3. Offer to start block 1 by invoking its `action` (a `review` or `resume`/INGEST on that
+   track). As the user finishes blocks, re-running `plan-day` reflects the progress (done
+   reviews drop out; touched tracks lose `stale`) — no separate "done today" state needed.
 
 ---
 
@@ -91,7 +114,12 @@ Identify which of the five intents the user wants. **If the intent is unclear, d
 2. Run:
    `python3 scripts/registry.py create-track --id <id> --title "<t>" --mode domain --pedagogy <p> [--deadline ...] [--goal "..."]`
 3. If the CLI errors because the id exists, pick a different id and retry — never overwrite.
-4. Confirm creation and offer to start ingesting material (intent 4).
+4. **Fill the MISSION.** `create-track` scaffolds a `tracks/<id>/MISSION.md` stub. Interview
+   the user for the real-world *why* / what success looks like / constraints / out-of-scope
+   (per `methods/learning-science.md`), then write the filled `MISSION.md` (removing the stub
+   marker). A vague mission is worse than none — push for the concrete outcome. If the user
+   wants to skip for now, leave the stub; STATUS will keep nudging via `mission_present:false`.
+5. Confirm creation and offer to start ingesting material (intent 4).
 
 ---
 
@@ -141,11 +169,16 @@ card's layer** so the human can rebalance an all-L1 set. **Do not write anything
 edits). **Write nothing to disk until the user explicitly approves.**
 
 **Step 4 — On approval, persist (in this order):**
-1. **[engine — CLI]** For each approved card:
-   `python3 scripts/registry.py add-card --track <id> --question "..." --answer "..." [--tags ...]`
-   (the CLI allocates the id and seeds FSRS state — let it). Note: `add-card` writes
-   ONLY the card file + its FSRS seed in `review-state.json` — it does NOT write notes,
-   plan.md, or the MOC. The next two steps are yours to do by hand.
+1. **[engine — CLI]** Write the approved cards in ONE batch (all-or-nothing — preferred
+   over N single `add-card` calls): pipe a JSON array to `add-cards`:
+   ```
+   echo '[{"question":"...","answer":"...","tags":["L2"]}, ...]' | \
+     python3 scripts/registry.py add-cards --track <id>
+   ```
+   The CLI allocates contiguous ids, seeds FSRS state once, and rolls back every file if any
+   card is malformed. It writes ONLY the card files + their FSRS seeds in `review-state.json`
+   — NOT notes, plan.md, or the MOC. (Use single `add-card` only for a one-off addition.)
+   The next two steps are yours to do by hand.
 2. **[model — you write this file directly; no CLI does it]** Write the source + Map into
    `tracks/<id>/notes/<date>-<slug>.md`.
 3. **[model — you write this file directly; no CLI does it]** Add wikilinks to the new
@@ -162,6 +195,10 @@ edits). **Write nothing to disk until the user explicitly approves.**
 2. For each due card, run the track's pedagogy (default **active-recall**; **feynman** =
    ask the user to explain the answer back, then probe gaps). Follow `methods/<pedagogy>.md`.
    Show the question, let the user answer, then reveal the stored answer.
+   - **Leech handling (the "keeps failing" branch):** the `due` output carries each card's
+     `lapses` and `reps`. If a card is a leech — `lapses >= 3` (or it has failed the last 2
+     reviews) — don't just re-quiz it: switch to **socratic** or **feynman** for that card to
+     actually re-teach the underlying idea, and consider proposing a clearer replacement card.
 3. After each card, ask the user to self-rate 1–4 and record it:
    `python3 scripts/registry.py grade --track <id> --card <card-id> --grade <N>`
    Report the new due date the CLI prints. Move to the next card.

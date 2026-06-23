@@ -34,6 +34,21 @@ def repo_root() -> Path:
     return REPO_ROOT
 
 
+# ---------------------------------------------------------------------------
+# Tunable constants (orchestration). Surfaced here so they are not magic numbers
+# scattered through the code; the daily planner and status board read them.
+# ---------------------------------------------------------------------------
+
+STALE_THRESHOLD_DAYS = 7  # a track idle longer than this is "stale"
+URGENT_DAYS = 3  # a deadline within this many days is force-scheduled
+SEC_PER_CARD = 40  # review-time estimate per due card
+MAX_REVIEW_BLOCK_MIN = 25  # cap one track's review block so a backlog can't eat the day
+MIN_PER_NEW_BLOCK = 30  # default minutes for a "learn something new" block
+REANCHOR_MIN = 5  # quick "what was this track about" touch for a stale track
+DEFAULT_BUDGET_MIN = 60  # default daily time budget when none given
+MISSION_STUB_MARKER = "<!-- learn-everything:mission-stub -->"
+
+
 def tracks_dir(root: Path | None = None) -> Path:
     return (root or repo_root()) / "tracks"
 
@@ -178,6 +193,35 @@ def track_md_path(track_id: str, root: Path | None = None) -> Path:
 
 def review_state_path(track_id: str, root: Path | None = None) -> Path:
     return track_dir(track_id, root) / "review-state.json"
+
+
+def mission_path(track_id: str, root: Path | None = None) -> Path:
+    return track_dir(track_id, root) / "MISSION.md"
+
+
+def _mission_stub(title: str) -> str:
+    """A MISSION.md scaffold. Carries a marker so the board can tell stub from real."""
+    return (
+        f"# Mission: {title}\n\n"
+        f"{MISSION_STUB_MARKER}\n"
+        "<!-- Fill this in with the host model on your first session. A vague mission\n"
+        "     is worse than none — push for the concrete real-world why. -->\n\n"
+        "## Why\n_TBD — the concrete real-world outcome you're chasing._\n\n"
+        "## Success looks like\n- _TBD — a specific, observable thing you'll be able to do_\n\n"
+        "## Constraints\n- _TBD — time / budget / preferences that bound the approach_\n\n"
+        "## Out of scope\n- _TBD — adjacent things you are NOT chasing right now_\n"
+    )
+
+
+def mission_present(track_id: str, root: Path | None = None) -> bool:
+    """True iff MISSION.md exists AND has been filled in (stub marker removed)."""
+    path = mission_path(track_id, root)
+    if not path.exists():
+        return False
+    try:
+        return MISSION_STUB_MARKER not in path.read_text(encoding="utf-8")
+    except OSError:
+        return False
 
 
 def _build_track_md(meta: dict, goal: str) -> str:
@@ -346,6 +390,26 @@ def load_review_state(
 
 def save_review_state(track_id: str, state: dict, root: Path | None = None) -> None:
     _write_json(review_state_path(track_id, root), state)
+
+
+def review_log_path(track_id: str, root: Path | None = None) -> Path:
+    return track_dir(track_id, root) / "review-log.jsonl"
+
+
+def append_review_log(track_id: str, entry: dict, root: Path | None = None) -> None:
+    """Append one grading event to review-log.jsonl (append-only history).
+
+    This is the data the future personalized-weights optimizer + leech detection
+    read. It is best-effort: a logging failure must NEVER break grading, so we
+    warn and continue rather than raise.
+    """
+    try:
+        path = review_log_path(track_id, root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as exc:  # pragma: no cover - defensive
+        _warn(f"could not append review-log for '{track_id}' ({exc}); continuing")
 
 
 def _seed_new_card_state(today: str) -> dict:
@@ -539,6 +603,10 @@ def create_track(
         f"# {title} — Map of Content\n\n_Wikilinks to cards go here._\n",
         encoding="utf-8",
     )
+    # Scaffold a MISSION.md stub so the "ground every track in a why" discipline
+    # (methods/learning-science.md) can't be silently skipped — the board flags it
+    # as not-yet-filled until the stub marker is removed.
+    mission_path(track_id, root).write_text(_mission_stub(title), encoding="utf-8")
     save_review_state(track_id, {}, root)
 
     rebuild_registry(root)
@@ -560,9 +628,12 @@ def _track_record(track_id: str, root: Path | None = None) -> dict | None:
         "mode": meta.get("mode"),
         "pedagogy": meta.get("pedagogy"),
         "status": meta.get("status"),
+        "created": meta.get("created"),
         "deadline": meta.get("deadline"),
         "last_active": meta.get("last_active"),
         "next_action": meta.get("next_action"),
+        "goal_weight": meta.get("goal_weight"),
+        "minutes_per_new_block": meta.get("minutes_per_new_block"),
         "cards_total": len(list_card_ids(track_id, root)),
     }
 
@@ -647,7 +718,17 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
         days_to_deadline = _days_between(today, rec.get("deadline"))
         last_active = rec.get("last_active")
         stale_days = _days_between(last_active, today) if last_active else None
-        stale = bool(stale_days is not None and stale_days > 7)
+        stale = bool(stale_days is not None and stale_days > STALE_THRESHOLD_DAYS)
+        cards_total = rec.get("cards_total") or 0
+        # "Taught but retaining nothing": an active track that has had activity
+        # beyond its creation day yet has produced zero cards — the FSRS safety
+        # net is never engaged. Surfaced so STATUS can nudge distilling cards.
+        taught_since_created = bool(
+            (_days_between(rec.get("created"), last_active) or 0) > 0
+        )
+        needs_cards = bool(
+            rec.get("status") == "active" and cards_total == 0 and taught_since_created
+        )
         board.append(
             {
                 "id": track_id,
@@ -657,11 +738,15 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
                 "status": rec.get("status"),
                 "days_to_deadline": days_to_deadline,
                 "cards_due_today": _cards_due_today(track_id, today, root),
-                "cards_total": rec.get("cards_total"),
+                "cards_total": cards_total,
                 "last_active": last_active,
                 "stale_days": stale_days,
                 "stale": stale,
+                "needs_cards": needs_cards,
+                "mission_present": mission_present(track_id, root),
                 "next_action": rec.get("next_action"),
+                "goal_weight": rec.get("goal_weight"),
+                "minutes_per_new_block": rec.get("minutes_per_new_block"),
             }
         )
     # Deterministic "do this next" ordering (bridge until plan-day ships):
@@ -678,6 +763,155 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
         )
     )
     return {"today": today, "tracks": board}
+
+
+def _num(value, default: float) -> float:
+    """Best-effort numeric coercion of an optional frontmatter value."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _interleave_ties(blocks: list[dict]) -> list[dict]:
+    """De-cluster blocks of EQUAL score so one track doesn't stack back-to-back.
+
+    Only reorders within exact-score runs (never promotes a lower score above a
+    higher one), and greedily avoids repeating the previously emitted track.
+    Deterministic for a fixed input.
+    """
+    out: list[dict] = []
+    i, n = 0, len(blocks)
+    while i < n:
+        j = i
+        while j < n and blocks[j]["score"] == blocks[i]["score"]:
+            j += 1
+        remaining = blocks[i:j]
+        while remaining:
+            prev = out[-1]["track"] if out else None
+            pick = next((b for b in remaining if b["track"] != prev), remaining[0])
+            out.append(pick)
+            remaining.remove(pick)
+        i = j
+    return out
+
+
+def plan_day(
+    today: str | None = None,
+    minutes: int | None = None,
+    energy: str = "normal",
+    root: Path | None = None,
+) -> dict:
+    """Deterministic, time-boxed daily plan across all active tracks.
+
+    The ENGINE ranks + time-boxes (reproducible, testable); the host model only
+    narrates the given order. Read-only — writes nothing, like status/due.
+    """
+    import math
+
+    today = _today_str(today)
+    budget = int(minutes) if minutes is not None else DEFAULT_BUDGET_MIN
+    energy = energy if energy in ("low", "normal", "high") else "normal"
+
+    board = status_board(today, root)["tracks"]
+    blocks: list[dict] = []
+    for t in board:
+        if t.get("status") != "active":
+            continue
+        tid = t["id"]
+        d2d = t.get("days_to_deadline")
+        gw = _num(t.get("goal_weight"), 1.0)
+        if d2d is None:
+            deadline_score = 0.0
+        elif d2d < 0:
+            deadline_score = 300.0  # overdue
+        elif d2d <= 14:
+            deadline_score = (15 - d2d) * 10.0
+        else:
+            deadline_score = 0.0
+        urgent = d2d is not None and d2d <= URGENT_DAYS
+        deadline_reason = (
+            ["overdue"] if (d2d is not None and d2d < 0)
+            else (["deadline"] if deadline_score > 0 else [])
+        )
+        chose_review_or_new = False
+
+        due = t.get("cards_due_today") or 0
+        if due > 0:
+            est = min(MAX_REVIEW_BLOCK_MIN, max(1, math.ceil(due * SEC_PER_CARD / 60)))
+            score = (deadline_score + due * 3 + 5) * gw
+            blocks.append({
+                "track": tid, "title": t.get("title"), "kind": "review",
+                "action": f"review --track {tid}", "est_min": est, "due_count": due,
+                "score": round(score, 3), "urgent": urgent, "d2d": d2d,
+                "reason_codes": deadline_reason + ["due_cards"],
+            })
+            chose_review_or_new = True
+
+        na = t.get("next_action")
+        if na:
+            mpn = int(_num(t.get("minutes_per_new_block"), MIN_PER_NEW_BLOCK))
+            if energy == "low":
+                mpn = max(5, int(mpn * 0.6))
+            new_score = (deadline_score + 4) * gw
+            if energy == "low":
+                new_score *= 0.5  # demote learning-new when low energy
+            blocks.append({
+                "track": tid, "title": t.get("title"), "kind": "new",
+                "action": f"resume --track {tid}", "est_min": mpn, "due_count": 0,
+                "score": round(new_score, 3), "urgent": urgent, "d2d": d2d,
+                "next_action": na, "reason_codes": deadline_reason + ["next_action"],
+            })
+            chose_review_or_new = True
+
+        if t.get("stale") and not chose_review_or_new:
+            sd = t.get("stale_days") or 0
+            score = (min(sd, 60) + 1) * gw
+            blocks.append({
+                "track": tid, "title": t.get("title"), "kind": "re-anchor",
+                "action": f"resume --track {tid}", "est_min": REANCHOR_MIN,
+                "due_count": 0, "score": round(score, 3), "urgent": urgent, "d2d": d2d,
+                "stale_days": sd, "reason_codes": ["stale"],
+            })
+
+    blocks.sort(
+        key=lambda b: (-b["score"], b["d2d"] if b["d2d"] is not None else 10**9, b["track"], b["kind"])
+    )
+    blocks = _interleave_ties(blocks)
+
+    scheduled: list[dict] = []
+    deferred: list[dict] = []
+    total = 0
+    extra_new_used = False
+    for b in blocks:
+        fits = total + b["est_min"] <= budget
+        force = bool(b["urgent"])
+        bonus = energy == "high" and b["kind"] == "new" and not extra_new_used
+        if fits or force or bonus:
+            if not fits and force:
+                b = {**b, "reason_codes": b["reason_codes"] + ["budget_exceeded_for_deadline"]}
+            elif not fits and bonus:
+                b = {**b, "reason_codes": b["reason_codes"] + ["energy_high_bonus"]}
+                extra_new_used = True
+            scheduled.append(b)
+            total += b["est_min"]
+        else:
+            deferred.append({**b, "reason_codes": b["reason_codes"] + ["over_budget"]})
+
+    tracks_touched = sorted({b["track"] for b in scheduled})
+    return {
+        "today": today,
+        "budget_min": budget,
+        "energy": energy,
+        "scheduled": scheduled,
+        "deferred": deferred,
+        "summary": {
+            "total_min": total,
+            "budget_min": budget,
+            "tracks_touched": len(tracks_touched),
+            "blocks": len(scheduled),
+        },
+    }
 
 
 def add_card(
@@ -704,6 +938,65 @@ def add_card(
     return card_id
 
 
+def add_cards(
+    track_id: str,
+    cards: list[dict],
+    today: str | None = None,
+    root: Path | None = None,
+) -> list[str]:
+    """Add several cards in ONE batch — the human-approved set from an ingest.
+
+    Loads/saves review-state.json ONCE (not once-per-card) and is all-or-nothing:
+    on any failure, the card files written this call are removed so a partial set
+    never leaks. Each card is a dict {question, answer, tags?:list[str]}.
+    """
+    if not track_md_path(track_id, root).exists():
+        raise ValueError(f"unknown track '{track_id}'")
+    if not isinstance(cards, list) or not cards:
+        raise ValueError("add_cards needs a non-empty list of cards")
+    today = _today_str(today)
+
+    state = load_review_state(track_id, root, on_corrupt="raise")
+    cdir = cards_dir(track_id, root)
+    cdir.mkdir(parents=True, exist_ok=True)
+
+    # Allocate all ids up front from the current max so the batch is contiguous.
+    start = 0
+    for cid in list_card_ids(track_id, root):
+        m = CARD_ID_RE.match(f"{cid}.md")
+        if m:
+            start = max(start, int(m.group(1)))
+
+    written: list[Path] = []
+    new_ids: list[str] = []
+    try:
+        for i, card in enumerate(cards, start=1):
+            q = (card.get("question") or "").strip()
+            a = (card.get("answer") or "").strip()
+            if not q or not a:
+                raise ValueError(f"card #{i} is missing question or answer")
+            tags = card.get("tags") or []
+            card_id = f"card-{start + i:04d}"
+            path = cdir / f"{card_id}.md"
+            path.write_text(
+                _build_card_md(card_id, q, a, list(tags), track_id), encoding="utf-8"
+            )
+            written.append(path)
+            state[card_id] = _seed_new_card_state(today)
+            new_ids.append(card_id)
+        save_review_state(track_id, state, root)  # single write
+    except Exception:
+        for p in written:  # rollback partial card files
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        raise
+
+    rebuild_registry(root)
+    return new_ids
+
+
 def due_cards(
     track: str = "all",
     today: str | None = None,
@@ -726,12 +1019,17 @@ def due_cards(
             # unseeded or malformed -> due now
             due = entry.get("due") if isinstance(entry, dict) else today
             if due is None or _due_le(due, today):
+                e = entry if isinstance(entry, dict) else {}
                 result.append(
                     {
                         "track": track_id,
                         "card": card_id,
                         "question": read_card_question(track_id, card_id, root),
                         "due": due if due is not None else today,
+                        # lapses/reps let the review loop spot leeches (a card that
+                        # keeps failing) and switch pedagogy — see active-recall.md.
+                        "lapses": e.get("lapses", 0),
+                        "reps": e.get("reps", 0),
                     }
                 )
     return result
@@ -771,6 +1069,21 @@ def grade_card(
 
     state[card_id] = new_state
     save_review_state(track_id, state, root)
+
+    # Append-only grading history: feeds leech detection + future weight tuning.
+    append_review_log(
+        track_id,
+        {
+            "date": today,
+            "card": card_id,
+            "grade": grade,
+            "due": new_state.get("due"),
+            "reps": new_state.get("reps"),
+            "lapses": new_state.get("lapses"),
+            "state": new_state.get("state"),
+        },
+        root,
+    )
 
     update_track_meta(track_id, {"last_active": today}, root)
     rebuild_registry(root)
@@ -832,9 +1145,25 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--tags", default="")
     sp.add_argument("--today", default=None)
 
+    sp = sub.add_parser(
+        "add-cards",
+        help="add a batch of approved cards (JSON array on stdin), all-or-nothing",
+    )
+    sp.add_argument("--track", required=True)
+    sp.add_argument("--today", default=None)
+
     sp = sub.add_parser("due", help="list due cards")
     sp.add_argument("--track", default="all")
     sp.add_argument("--today", default=None)
+
+    sp = sub.add_parser(
+        "plan-day", help="ranked, time-boxed daily plan across active tracks"
+    )
+    sp.add_argument("--today", default=None)
+    sp.add_argument("--minutes", type=int, default=None, help="time budget (default 60)")
+    sp.add_argument(
+        "--energy", default="normal", choices=["low", "normal", "high"]
+    )
 
     sp = sub.add_parser("grade", help="grade a card")
     sp.add_argument("--track", required=True)
@@ -882,8 +1211,17 @@ def main(argv: list[str] | None = None) -> int:
                     today=args.today,
                 )
             )
+        elif args.command == "add-cards":
+            try:
+                cards = json.loads(sys.stdin.read())
+            except json.JSONDecodeError as exc:
+                print(f"error: invalid JSON on stdin ({exc})", file=sys.stderr)
+                return 1
+            _print_json(add_cards(args.track, cards, today=args.today))
         elif args.command == "due":
             _print_json(due_cards(args.track, args.today))
+        elif args.command == "plan-day":
+            _print_json(plan_day(args.today, args.minutes, args.energy))
         elif args.command == "grade":
             new_due = grade_card(args.track, args.card, args.grade, today=args.today)
             print(new_due)

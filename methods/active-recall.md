@@ -52,6 +52,22 @@ Guidance for the learner:
 4. At session end, give a short summary: how many reviewed, the grade spread, and what to
    come back to. Optionally log the session via the registry's `log` command.
 
+## Leech handling (when a card keeps failing)
+
+A **leech** is a card that won't stick — repeated review just re-fails it. The `due` command
+reports each card's `lapses` and `reps`, so the trigger is concrete: treat a card as a leech
+when **`lapses >= 3`** (or it failed its last 2 reviews). Re-quizzing a leech is wasted effort.
+Instead:
+
+1. Stop drilling it as a flashcard for the moment. Switch to **socratic** or **feynman** for
+   that card and re-teach the underlying idea — the failure usually means the concept wasn't
+   understood, not that memory failed.
+2. Suspect the card itself: is it non-atomic, ambiguous, or two ideas? If so, propose a
+   clearer replacement (split it, add context) per the Card quality gate below, with the
+   user's approval.
+3. Every grading event is appended to the track's `review-log.jsonl`, so this history persists
+   across sessions and also feeds future personalized-weight tuning.
+
 ## Card quality gate (apply before saving any card)
 
 A spaced-repetition system is only as good as its cards. Before saving a distilled card

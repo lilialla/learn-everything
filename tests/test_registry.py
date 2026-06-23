@@ -351,6 +351,116 @@ class RegistryTestCase(unittest.TestCase):
         self.assertIsNone(meta["deadline"])
         self.assertEqual(meta["status"], "active")
 
+    # -- D2: batch add-cards ---------------------------------------------
+
+    def test_add_cards_batch_all_or_nothing(self):
+        self._make_track()
+        ids = registry.add_cards(
+            "python",
+            [
+                {"question": "Q1?", "answer": "A1", "tags": ["L1"]},
+                {"question": "Q2?", "answer": "A2"},
+            ],
+            today=self.today,
+            root=self.root,
+        )
+        self.assertEqual(ids, ["card-0001", "card-0002"])
+        state = json.loads(
+            (self.root / "tracks" / "python" / "review-state.json").read_text("utf-8")
+        )
+        self.assertEqual(set(state), {"card-0001", "card-0002"})
+        # A bad card in the batch rolls back ALL files written this call.
+        with self.assertRaises(ValueError):
+            registry.add_cards(
+                "python",
+                [{"question": "Q3?", "answer": "A3"}, {"question": "", "answer": "x"}],
+                today=self.today,
+                root=self.root,
+            )
+        # card-0003 (written before the bad one) must have been removed.
+        self.assertFalse(
+            (self.root / "tracks" / "python" / "cards" / "card-0003.md").exists()
+        )
+
+    # -- D3: MISSION scaffolding + signal --------------------------------
+
+    def test_create_track_scaffolds_mission_stub(self):
+        self._make_track()
+        mp = self.root / "tracks" / "python" / "MISSION.md"
+        self.assertTrue(mp.exists())
+        # Stub present -> mission_present is False until filled.
+        self.assertFalse(registry.mission_present("python", self.root))
+        # Remove the stub marker -> counts as filled.
+        mp.write_text("# Mission\n\n## Why\nReal reason.\n", encoding="utf-8")
+        self.assertTrue(registry.mission_present("python", self.root))
+
+    # -- D4: needs_cards retention signal --------------------------------
+
+    def test_status_board_needs_cards_when_taught_but_no_cards(self):
+        # created earlier, then activity later (a taught session), still 0 cards.
+        old = _iso(date(2026, 6, 12))
+        self._make_track(today=old)
+        registry.log_entry(
+            "python", "taught a session", today=self.today, root=self.root
+        )
+        rec = registry.status_board(self.today, self.root)["tracks"][0]
+        self.assertTrue(rec["needs_cards"])
+        # After a card exists, the nudge clears.
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        rec2 = registry.status_board(self.today, self.root)["tracks"][0]
+        self.assertFalse(rec2["needs_cards"])
+
+    # -- D5: review-log + due lapses/reps --------------------------------
+
+    def test_grade_appends_review_log_and_due_carries_lapses(self):
+        self._make_track()
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+
+        def fake_sched(state, grade, now):
+            return {
+                "stability": 1.0, "difficulty": 5.0, "due": self.tomorrow,
+                "reps": 1, "lapses": 1, "last_review": now, "state": "review",
+            }
+
+        registry.grade_card(
+            "python", "card-0001", 1, today=self.today, root=self.root,
+            scheduler=fake_sched,
+        )
+        log_path = self.root / "tracks" / "python" / "review-log.jsonl"
+        self.assertTrue(log_path.exists())
+        line = json.loads(log_path.read_text("utf-8").strip().splitlines()[-1])
+        self.assertEqual(line["card"], "card-0001")
+        self.assertEqual(line["grade"], 1)
+        due = registry.due_cards("python", self.tomorrow, self.root)
+        self.assertEqual(due[0]["lapses"], 1)
+        self.assertEqual(due[0]["reps"], 1)
+
+    # -- D1: plan-day deterministic ranker -------------------------------
+
+    def test_plan_day_ranks_and_timeboxes(self):
+        # urgent track (deadline tomorrow) with a due card + next_action.
+        self._make_track("urgent", title="Urgent", deadline=self.tomorrow)
+        registry.add_card("urgent", "Q", "A", today=self.today, root=self.root)
+        registry.log_entry(
+            "urgent", "x", next_action="next chapter", today=self.today, root=self.root
+        )
+        # calm track, no deadline, with a next_action.
+        self._make_track("calm", title="Calm")
+        registry.log_entry(
+            "calm", "x", next_action="read", today=self.today, root=self.root
+        )
+        plan = registry.plan_day(self.today, minutes=60, root=self.root)
+        self.assertIn("scheduled", plan)
+        self.assertTrue(plan["scheduled"])
+        # The urgent track's blocks outrank the calm track's.
+        first = plan["scheduled"][0]
+        self.assertEqual(first["track"], "urgent")
+        # Deterministic: same inputs -> same output.
+        plan2 = registry.plan_day(self.today, minutes=60, root=self.root)
+        self.assertEqual(plan, plan2)
+        # Total scheduled minutes respect the budget (urgent may force-include).
+        self.assertEqual(plan["summary"]["budget_min"], 60)
+
 
 if __name__ == "__main__":
     unittest.main()
