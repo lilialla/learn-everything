@@ -1151,6 +1151,44 @@ def log_entry(
     rebuild_registry(root)
 
 
+def ingest_check(track_id: str, root: Path | None = None) -> dict:
+    """Deterministic pre-flight gate the `learn` skill MUST pass before INGEST.
+
+    Enforces the things the model tends to skip: the track exists, its MISSION is
+    actually filled (not the stub), and it is active. Returns {ready, blockers, ...}
+    so the skill can hard-stop and resolve blockers (fill MISSION, etc.) instead of
+    free-wheeling straight into card generation.
+    """
+    if not track_md_path(track_id, root).exists():
+        return {
+            "track": track_id,
+            "ready": False,
+            "blockers": ["track does not exist — CREATE it first"],
+            "mission_present": False,
+            "pedagogy": None,
+            "mode": None,
+        }
+    meta = read_track(track_id, root)
+    miss = mission_present(track_id, root)
+    status = meta.get("status")
+    blockers: list[str] = []
+    if not miss:
+        blockers.append(
+            "MISSION.md is still a stub — interview the learner and fill the 'why' "
+            "before any teaching"
+        )
+    if status not in ("active", None):
+        blockers.append(f"track status is '{status}', not active")
+    return {
+        "track": track_id,
+        "ready": not blockers,
+        "blockers": blockers,
+        "mission_present": miss,
+        "pedagogy": meta.get("pedagogy"),
+        "mode": meta.get("mode"),
+    }
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1177,6 +1215,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--today", default=None)
 
     sp = sub.add_parser("next-card-id", help="print next card id for a track")
+    sp.add_argument("--track", required=True)
+
+    sp = sub.add_parser(
+        "ingest-check", help="pre-flight gate for INGEST (track ready? MISSION filled?)"
+    )
     sp.add_argument("--track", required=True)
 
     sp = sub.add_parser("add-card", help="add a card to a track")
@@ -1241,6 +1284,8 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(status_board(args.today))
         elif args.command == "next-card-id":
             print(next_card_id(args.track))
+        elif args.command == "ingest-check":
+            _print_json(ingest_check(args.track))
         elif args.command == "add-card":
             tags = [t.strip() for t in args.tags.split(",") if t.strip()]
             print(

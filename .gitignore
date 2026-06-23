@@ -24,3 +24,14 @@ __pycache__/
 
 # OS cruft.
 .DS_Store
+
+# Obsidian vault runtime — created when this folder is opened as a vault. Huge
+# (bundles plugin binaries) and may contain auth tokens. NEVER ship.
+.obsidian/
+
+# Claudian plugin runtime + settings — its settings file holds the auth token. NEVER ship.
+.claudian/
+
+# Claude Code in-vault runtime; ship ONLY the discoverable skill symlink, nothing else.
+.claude/*
+!.claude/skills/

@@ -496,5 +496,28 @@ class RegistryTestCase(unittest.TestCase):
         self.assertEqual(list((self.root / "sub").glob("*.tmp")), [])
 
 
+    # -- INGEST pre-flight gate (enforce diagnose-first / MISSION-filled) --
+
+    def test_ingest_check_gates_on_mission_and_existence(self):
+        # unknown track -> not ready
+        r0 = registry.ingest_check("nope", self.root)
+        self.assertFalse(r0["ready"])
+        self.assertTrue(r0["blockers"])
+        # fresh track ships a MISSION stub -> not ready (mission blocker)
+        self._make_track()
+        r1 = registry.ingest_check("python", self.root)
+        self.assertFalse(r1["ready"])
+        self.assertFalse(r1["mission_present"])
+        self.assertTrue(any("MISSION" in b for b in r1["blockers"]))
+        # fill the mission -> ready
+        (self.root / "tracks" / "python" / "MISSION.md").write_text(
+            "# Mission\n\n## Why\nShip a thing.\n", encoding="utf-8"
+        )
+        r2 = registry.ingest_check("python", self.root)
+        self.assertTrue(r2["ready"])
+        self.assertEqual(r2["blockers"], [])
+        self.assertTrue(r2["mission_present"])
+
+
 if __name__ == "__main__":
     unittest.main()
