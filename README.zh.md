@@ -1,163 +1,247 @@
-# learn-everything（多轨学习操作系统）
+# learn-everything
 
-一个开源的、人机协作的**多轨学习操作系统**。它让一个人同时学习很多不同的东西——考试备考、
-开放式的专业领域、动手类技能——全部汇总在一块状态看板下。由宿主模型（今天是 Claude）负责
-*教学*（苏格拉底式提问、费曼讲解回放、主动回忆），由一个小而确定的引擎负责*把状态管好、管真实*。
+<p align="center">
+  <img src="assets/learn-everything-logo-anime-girl.png" alt="learn-everything logo" width="220">
+</p>
 
-## 它和别的工具有什么不一样
+<p align="center"><a href="README.md">English</a> · <b>中文</b></p>
 
-大多数学习工具一次只管一个主题：一个抽认卡 App、一个单科辅导、一套间隔复习卡组。它们共同
-缺的，是**跨轨编排**——这恰恰是你真正会遇到的难题：你同时在学五样东西，每一样还是不同*类型*，
-一切换轨就丢上下文。
+<p align="center">
+  <a href="https://github.com/lilialla/learn-everything/actions/workflows/ci.yml"><img src="https://github.com/lilialla/learn-everything/actions/workflows/ci.yml/badge.svg" alt="tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha">
+  <img src="https://img.shields.io/badge/engine-Python%20stdlib%20%C2%B7%20zero%20deps-3776AB?logo=python&logoColor=white" alt="engine">
+  <img src="https://img.shields.io/badge/spaced%20repetition-FSRS--6-success" alt="FSRS-6">
+  <img src="https://img.shields.io/badge/runs%20in-Obsidian-7C3AED?logo=obsidian&logoColor=white" alt="Obsidian">
+  <a href="#贡献"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"></a>
+</p>
 
-learn-everything 围绕两个现有工具没有结合起来的核心想法构建：
+**一个能同时教你多门学科、而且会记住你的 AI 导师。** 在 Obsidian 里用大白话跟它对话:它一次只教
+一个概念,记下你听懂了什么、在哪儿卡住,并悄悄安排间隔复习,让知识真正留下来。
 
-- **跨轨编排**——所有活跃的学习轨道都汇总在一块可重建的状态看板下。你问「接下来该做什么？」，
-  系统会跨所有轨道一次性回答：哪些卡片到期该复习、哪条轨道停滞了、哪条临近截止日期。
-- **逐轨教学法**——每条轨道自己选择希望被怎样教（苏格拉底 / 费曼 / 主动回忆）。教学方法是
-  *数据*，不是写死的行为，因此一条领域轨道和一条考试轨道可以用完全不同的方式来追问。
+> 大多数学习工具一次只管一个主题、一种方法。learn-everything 为真实处境而造:你同时在学五样东西——
+> 一个专业领域、一门考试、一项编程技能——每样需要*不同*的教法,而你一切换就丢了线索。这个东西替你接住线索。
 
-## 设计：内核 + 适配器
+---
 
-系统分为**可移植内核**和一层很薄的**宿主适配器**。可移植内核是一个确定性引擎（FSRS 排程、
-逐轨状态文件、状态看板），只用 Python 标准库编写——不依赖 `pip`，不含任何 Claude 专属代码——
-再加上一层*方法层*，即一组以 markdown 数据文件形式存在的教学法模板；今天的宿主适配器是一个
-轻量的 Claude Code 技能（`skills/learn/`），它通过读取 `TRACK.md` 文件、调用引擎来编排
-创建 / 录入 / 复习。**插件本身不是智能：** 宿主模型按方法层执行教学，引擎只提供确定性的支撑结构。
-MCP 服务器与其他宿主适配器属于后续工作——内核的接口设计已经为它们预留了不需重写的接缝。
+## 为什么不一样
 
-## 快速上手
+- **先教,不是卡片工厂。** 它以对话方式教你(讲解 → 你试 → 纠正 → 确认),**等你真懂了**才提炼几张
+  复习卡。读完材料直接甩一串卡片,是它明令拒绝的反模式。
+- **跨轨道编排。** 每门学科是一条"轨道",汇在一块看板下。问一句*"今天我该学什么?"*,它跨所有轨道
+  一次性回答——哪些到期该复习、哪条荒废了、哪条临近截止——并排出带时间盒的计划。
+- **它记住的是你,不只是材料。** 每次会话都留下一份记忆摘要、你的误解、你问过的术语、以及续学指针——
+  几天后它能还原*"你学了什么、在哪卡住、下一步做什么"*。
+- **一套真正的教学法工具箱。** 11 种有循证依据的教学方法(精读带学、苏格拉底、费曼、worked examples、
+  刻意练习、间隔/主动回忆、精加工、双重编码、元认知……),按材料和学习者自动选用。
+- **Obsidian 原生、一个软件搞定。** 通过 Claudian 插件在 Obsidian 内运行:左边读、右边跟导师对话,
+  笔记实时长进你的库。全是你自己的 markdown。
+- **默认隐私 + 零依赖。** 你的学习数据从不离开本机、且被 gitignore;引擎是纯 Python 标准库——无需 `pip install`。
 
-learn-everything 开箱即用配合 **Claude Code**——把它指向 `learn` 技能即可。
+## 你会得到什么
 
-```bash
-# 1. 克隆
-git clone <你的仓库地址> learn-everything
-cd learn-everything
+- 一个任意学科、用你母语对话的导师。
+- 自动、持久的笔记 + 每条轨道的"内容地图"。
+- 间隔复习(FSRS-6),安排复习时点,让知识留存。
+- 一份跨所有学科、带时间盒的"今天学什么"计划。
+- 被捕捉的误解会**反哺**——下次先复查你的弱点,并纠正教学路线。
+- 提问热力图——看你对哪些概念问得最多(你的弱点/重点)。
+- 看得见的进度:学了多少卡、多少卡锁进长期记忆、本周正确率。
 
-# 2. 在 Claude Code 中使用，调用 skills/learn/ 技能
-#    （在会话里直接说「开一条学习轨道」/「复习一下到期的卡片」即可）
+## 快速上手(在 Obsidian 里直接说话)
 
-# 3. 创建一条轨道
-python3 scripts/registry.py create-track \
-  --id llm-agents --title "LLM 与智能体" --mode domain --pedagogy socratic \
-  --goal "搞懂现代智能体架构"
+预期用法是**在 Obsidian 里、用大白话**——你完全不碰命令行。
 
-# 4. 录入一个来源（宿主模型提出候选卡片，你确认后写入）
-#    然后加入一张已确认的卡片：
-python3 scripts/registry.py add-card --track llm-agents \
-  --question "FSRS 排的是什么？" --answer "每张卡片的下次复习日期。" --tags fsrs
+**第一天 — 一次性安装(约 10 分钟):**
 
-# 5. 查看到期卡片，然后打分
-python3 scripts/registry.py due --track all
-python3 scripts/registry.py grade --track llm-agents --card card-0001 --grade 3
+1. **拿到文件:** `git clone https://github.com/lilialla/learn-everything.git`。
+2. **在 Obsidian 打开:** *打开文件夹作为库* → 选 `learn-everything` 文件夹。
+3. **装 [Claudian](https://github.com/YishenTu/claudian) 插件**(社区插件 → 搜 "Claudian" → 安装 → 启用)。
+   它在右侧栏放一个能读写你库的 AI 导师。
+4. **(macOS)若 Claudian 报 401 / 认证错误:** 它内置的 Claude 需要一份凭证。终端跑 `claude setup-token`,
+   把 token 填进 Claudian 设置的 `CLAUDE_CODE_OAUTH_TOKEN`。(若你用 Claude Code 订阅登录,也可把
+   keychain 凭证导出到 `~/.claude/.credentials.json`。)
+5. **(可选)原生复习:** 装 [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition),
+   导师做的卡片也能在 Obsidian 里直接复习。
+
+**然后只管在右侧栏跟导师说话** —— 无需记任何命令:
+
+- *"我想学 &lt;某主题&gt;"* / *"教我这篇文章"*(粘贴或打开它)
+- *"接着上次继续"*
+- *"考考我"* · *"今天我该学什么?"* · *"我学得怎么样?"*
+
+它一次教一个概念,边教边把笔记写进你的库,并安排复习让知识真正留下。
+
+**下次回来:** 打开库问一句*"今天我该学什么?"*——它会先告诉你所有学科一共多少卡到期。(想不打开也被提醒?
+把这一行放进 Daily Note 或定时任务,打印到期数——无需后台守护进程:`python3 scripts/registry.py status`。)
+
+## 工作原理
+
+```
+        你说话(大白话)
+              │
+   ┌──────────▼───────────┐     教 → 听懂 → 提炼卡片 → 复习 → 续学
+   │  learn 技能(宿主适配) │     读你的话、调引擎、按教学法走
+   └──────────┬───────────┘
+   methods/*.md │ scripts/*.py
+   (怎么教)     │ (确定性状态:排程、文件、看板)
+              ▼
+         tracks/<id>/   ← 你的学习,纯 markdown,归你所有
 ```
 
-所有内容都是你能直接读、改、自行版本管理的纯文本文件。
+干净地分两层:
 
-## 在 Obsidian 里用（一个软件搞定）
+- **可移植内核** —— 确定性引擎(`scripts/`:FSRS 排程、逐轨状态文件、状态看板、每日计划器),只用
+  Python **标准库**,外加一层**方法层**(`methods/*.md`)——教学法模板,纯 markdown 数据。
+- **宿主适配器** —— 一个很薄的 Claude Code 技能(`skills/learn/`),把你的大白话变成引擎调用和教学循环。
+  **技能本身不是智能:**宿主模型按方法层执行教学,引擎只负责把状态管真(它绝不瞎猜到期日或卡片 id)。
+  MCP server / 其他宿主适配器是后续工作——内核接口设计成无需重写即可接入。
 
-learn-everything 的文件夹本身就是一个合法的 Obsidian 库（markdown + frontmatter +
-`[[wikilink]]` + 每条轨道的 `plan.md` 内容地图），所以你可以在一个窗口里跑完整个流程：
+## 教学法工具箱
 
-1. **把仓库作为库在 Obsidian 中打开**——左边渲染原文笔记、卡片和 `plan.md`。
-2. **装 [Claudian](https://github.com/YishenTu/claudian)**（MIT）：它把 Claude Code 嵌成侧边栏，
-   以该库为工作目录。这个侧栏就是你的导师——左边读、右边问，笔记实时长进 `tracks/<id>/notes/`。
-3. **装 [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition)**
-   （MIT）：`add-card` 写出的卡片采用它的 `#flashcards/<track>` + `?` 分隔格式，可在 Obsidian
-   里原生复习。learn-everything 的 FSRS 引擎仍是权威排程器（状态存在 `review-state.json`）。
+教学方法是**数据**(`methods/*.md`),按 材料 × 学习者 × 目标 自动选——你只会看到结果("我带你过一遍" /
+"我考考你" / "你讲给我听")。
 
-> ⚠️ **请在你的机器上验证一次：** Obsidian 内一体化路径依赖 Claudian 嵌入的 Claude Code 能通过
-> Bash 跑我们的 Python 引擎。理论上可行但未经验证——用
-> `python3 scripts/fsrs.py schedule --state '-' --grade 3 --now 2026-06-22` 测一下。若脚本执行
-> 被沙箱拦截，就改用「终端里的 Claude Code + 旁边开 Obsidian（同一文件夹）」。
+| 方法 | 适用 |
+|---|---|
+| `tutor` | 精读带学——知识/说明性材料的默认 |
+| `socratic` | 以提问引导,让你自己发现答案 |
+| `feynman` | 你讲回来,模型追问漏洞 |
+| `active-recall` | 检索练习式测验——复习默认(FSRS 的搭档) |
+| `worked-examples` | 程序性 / 数学 / 编程——先看解好的例题,再逐步撤掉脚手架 |
+| `deliberate-practice` | 练成一项可执行技能:锁定边缘、刻意练、即时反馈 |
+| `elaboration` | 已掌握者的上行挑战(迁移、边界、压缩) |
+| `dual-coding` | 文字配图、概念交错 |
+| `metacognition` | 先预测再对照、计划/监控/评估、识破"假会了" |
+| `learner-model` | 每轮静默判读掌握度/误解/负荷,引导每一步 |
+| `learning-science` | 横切的"为什么":使命、最近发展区、长期留存 |
+
+## 记忆与可追溯
+
+learn-everything 让你的学习留下持久、可查的痕迹——全是纯 markdown:
+
+- **`CONTEXT.md`**(每轨)—— 续学时先读的滚动摘要:*在哪 / 学了什么 / 已知卡点 / 待续线索。*
+- **`learning-records/`** —— 带日期、只追加的洞见(每次纠正的误解、已有知识、展示的掌握)。
+- **`glossary.md`** —— 你问过的术语(一问就记,会用了再升级);也是一张"哪里难"的地图。
+- **提问热力图** —— 每个零散提问按概念记录;`questions` 排出你问得最多的地方(弱点/重点),反哺重教与出卡。
+- **`progress`** —— 每轨三个留存数字:总卡数 / 已固化(进长期记忆)/ 7 日正确率。
+
+被捕捉的误解会**反哺**:下次先复查你的卡点、纠正路线——已掌握的略过、错过的加重、旧的失误换个角度重教。
 
 ## 数据模型
 
-**唯一真实来源**是 `tracks/` 下的逐轨文件夹。仓库根目录的 `registry.json` 只是**可重建的缓存**
-——它随时可以从各个 `TRACK.md` 文件重新生成。
+**唯一真实来源**是 `tracks/` 下的逐轨文件夹;根目录的 `registry.json` 只是**可重建缓存**——随时能从
+`TRACK.md` 重新生成。
 
 ```
 tracks/<id>/
-  TRACK.md            # 唯一真实来源：YAML frontmatter（id、title、mode、pedagogy、
-                      #   status、created、deadline、last_active、next_action）
-                      #   + "## Goal" + "## Log" 表格
-  cards/
-    card-0001.md      # frontmatter（id、tags）+ "#flashcards/<track>" + 问题 / "?" / 答案
-                      #   （兼容 Obsidian 间隔复习插件，可在 Obsidian 里原生复习）
-  notes/
-    <date>-<slug>.md  # 自由形式的学习笔记
-  plan.md             # 内容地图（MOC）；用 wikilink 链接到卡片
-  review-state.json   # FSRS 边车文件：每张卡的 stability/difficulty/due/reps/lapses/state
+  TRACK.md            # 真实来源:YAML frontmatter(id、title、mode、pedagogy、status、
+                      #   created、deadline、last_active、next_action)+ "## Goal" + "## Log"
+  MISSION.md          # 这条轨道的真实"为什么"(为每次会话定锚)
+  CONTEXT.md          # 滚动记忆摘要(续学先读)
+  plan.md             # 内容地图:会话 + 卡片 wikilink
+  cards/card-0001.md  # frontmatter + "#flashcards/<track>" + 问题 / "?" / 答案(兼容 Obsidian 间隔复习)
+  notes/<date>-*.md   # 你在读的原文 + 导师讲义笔记
+  learning-records/   # 带日期的决策级洞见(纠正的误解等)
+  review-state.json   # FSRS 边车:每卡 stability/difficulty/due/reps/lapses/state
+  review-log.jsonl    # 只追加的评分历史
+  questions-log.jsonl # 只追加的零散提问(热力图来源)
 
-registry.json         # 所有轨道的可重建缓存（绝不是唯一来源）
+registry.json         # 所有轨道的可重建缓存(绝不是唯一来源)
 ```
 
-卡片 id 按轨道补零、顺序递增。新卡片以 FSRS `state="new"`、`due=today` 初始化。如果
-`registry.json` 或某个 `review-state.json` 丢失或损坏，引擎会自动重建 / 优雅降级，并把警告写到
-stderr——它绝不丢失真实来源，也绝不让整次运行崩溃。
+`registry.json` 或某个 `review-state.json` 丢失/损坏时,引擎会重建 / 优雅降级并告警到 stderr——绝不丢失
+真实来源、绝不让整次运行崩溃。整文件写入是原子的(临时文件 + 改名),在 Google Drive / Dropbox 同步下安全。
 
-## 命令行接口
+<details>
+<summary><b>CLI 参考(导师替你调,你很少需要直接用)</b></summary>
 
-引擎就是两个脚本。技能会调用它们，你也可以直接用。
+引擎是两个标准库脚本。`registry.py` 管所有状态;`fsrs.py` 是调度器。
 
-`scripts/fsrs.py`
+```bash
+# 概览与计划
+python3 scripts/registry.py status [--today YYYY-MM-DD]        # 看板,先报到期卡数
+python3 scripts/registry.py plan-day [--minutes N] [--energy low|normal|high]
+python3 scripts/registry.py progress [--track <id|all>]        # 总数 / 已固化 / 7日正确率
 
-| 命令 | 用途 |
-| --- | --- |
-| `schedule --state '<json\|->' --grade <1-4> --now YYYY-MM-DD` | 打印某张卡片新的 FSRS 状态。`--state '-'`（或省略）= 全新卡片。打分：1=Again、2=Hard、3=Good、4=Easy。 |
+# 建轨与门禁
+python3 scripts/registry.py create-track --id <id> --title <t> --mode domain --pedagogy <p> [--deadline YYYY-MM-DD] [--goal "..."]
+python3 scripts/registry.py ingest-check --track <id>          # 可以开学了吗?(MISSION 填了吗)
+python3 scripts/registry.py session-check --track <id>         # 这次会话留下卡或理由了吗?
 
-`scripts/registry.py`
+# 卡片与复习
+echo '[{"question":"...","answer":"...","tags":["L2"]}]' | python3 scripts/registry.py add-cards --track <id>
+python3 scripts/registry.py due [--track <id|all>] [--today YYYY-MM-DD]
+python3 scripts/registry.py grade --track <id> --card <card-id> --grade <1-4> [--today YYYY-MM-DD]
 
-| 命令 | 用途 |
-| --- | --- |
-| `create-track --id <id> --title <t> --mode domain --pedagogy <p> [--deadline YYYY-MM-DD] [--goal "..."]` | 搭建一条新轨道的文件夹并更新缓存。 |
-| `rebuild` | 重新扫描 `tracks/*/TRACK.md`，重写并打印 `registry.json`。 |
-| `status [--today YYYY-MM-DD]` | 先重建，再打印看板：每条轨道 + 距截止天数 + 今日到期卡片数 + 是否停滞。 |
-| `next-card-id --track <id>` | 打印下一个可用卡片 id（如 `card-0004`）。 |
-| `add-card --track <id> --question "..." --answer "..." [--tags a,b] [--today YYYY-MM-DD]` | 写入一张新卡片并初始化其复习状态。 |
-| `due [--track <id\|all>] [--today YYYY-MM-DD]` | 列出到期卡片（`due <= today`）。 |
-| `grade --track <id> --card <card-id> --grade <1-4> [--today YYYY-MM-DD]` | 用 FSRS 给卡片打分，更新复习状态与 `last_active`。 |
-| `log --track <id> --what "..." [--next "..."] [--artifacts "..."]` | 追加一行 `## Log`，并更新 `last_active` / `next_action`。 |
+# 记忆与信号
+python3 scripts/registry.py log --track <id> --what "..." [--next "..."] [--no-cards-reason "..."]
+python3 scripts/registry.py log-question --track <id> --concept "<C>" --question "<Q>" [--term "<T>"]
+python3 scripts/registry.py questions [--track <id|all>]       # 你问得最多的地方,排行
+python3 scripts/registry.py rebuild                            # 从 TRACK.md 重建 registry.json
 
-`registry.py` 在打分时导入 `fsrs.py`。省略 `--today` 时默认取系统当天日期。
+# 调度器(由 registry.py 调用;也可单独用)
+python3 scripts/fsrs.py schedule --state '<json|->' --grade <1-4> --now YYYY-MM-DD
+```
 
-## 保密与隐私
+评分:`1`=Again `2`=Hard `3`=Good `4`=Easy。省略 `--today` 时取系统当天。
+</details>
 
-> **在录入任何敏感内容之前，请先读这一节。**
+## 隐私与保密
 
-- 当你录入一个来源时，**它的正文会被发送给宿主模型**（Claude）以生成候选卡片。不要录入你无权
-  发送给第三方模型的材料。
-- 整个 `tracks/` 目录都被 **gitignore**——你的学习数据、笔记和卡片只留在本地，绝不会被误提交。
-  仅有 `tracks/.gitkeep` 被纳入版本管理。
-- **不要提交涉密或客户材料。** 本仓库定位是作为干净、无数据的产品发布；你真实的轨道以本地的、
-  被 gitignore 的数据形式存在。
-- 对于涉密文件（特权通信、客户卷宗、并购材料），**录入前先确认授权**——把宿主模型当作外部服务对待。
+> **学习任何敏感内容前,先读这段。**
 
-被录入的来源文本一律按**数据，而非指令**处理：文档或网页里嵌入的祈使句是要被分析的内容，绝不是
-要被执行的命令。
+- 录入一个来源时,**它的正文会被发送给宿主模型**(Claude)。不要录入你无权发送给第三方模型的材料;
+  涉密/客户/法律文件先确认授权。
+- 你的学习放在 `tracks/`,已被 **gitignore**——笔记、卡片、提问、记忆都只留本地,绝不会被误提交。
+  `profile.md`、`registry.json`、`.obsidian/`、`.claudian/`(可能含你的认证 token)也都被 gitignore。
+- 录入的来源文本一律按**数据,而非指令**处理——文档/网页里嵌入的祈使句是要分析的内容,绝不是要执行的命令。
 
-## 关于 FSRS 的说明
+## 关于 FSRS
 
-引擎用纯标准库 Python（零依赖）实现了 **FSRS-6** 间隔复习。它经过**行为验证**——由测试锁定其
-排程行为（打分顺序、到期日期单调性、新卡片初始化）。与参考 FSRS 实现的精确*数值对齐*被刻意
-**延后**：MVP 的目标是正确、可预测、有良好测试覆盖的行为，而不是逐位复刻参考常数。
+引擎用纯标准库 Python 实现了 **FSRS-6** 间隔复习。它经过**行为验证**(测试锁定打分顺序、到期日单调性、
+新卡初始化);与参考实现的精确数值对齐被刻意延后——目标是正确、可预测、有良好测试覆盖的排程,而非逐位
+复刻常数。个性化权重在有真实复习历史前不在范围内。
+
+## 项目结构
+
+```
+skills/learn/SKILL.md     唯一的宿主适配器技能(含 FEEDBACK.md 改进日志)
+methods/*.md              11 法教学法工具箱(数据,非代码)
+scripts/registry.py       所有轨道/卡片/registry/计划器状态读写(标准库)
+scripts/fsrs.py           FSRS-6 调度器(标准库)
+tests/                    引擎单元测试(44)
+plans/                    设计规格、功能设计、架构/优化计划
+docs/                     审计 + 架构优化计划
+tracks/                   你的学习数据(已 gitignore)
+```
 
 ## 路线图
 
-- **`exam` 与 `applied` 模式**——在 MVP 的 `domain` 模式之上扩展（主干设计已为它们预留了无需返工的接缝）。
-- **MCP 服务器**——把内核接口封装为 MCP 的 tools / prompts / resources，让其他宿主（及其他 Claude 界面）
-  无需重写即可接入。
-- **Obsidian 配套**——基础的一体化用法现在就能用（见上文「在 Obsidian 里用」）；更深的配套
-  （在 Obsidian 内显示到期卡片数 / `next_action`、FSRS 状态双向同步）是自然的下一步。
+待建功能 backlog(exam 与 applied 轨道模式、URL / 长文档摄入、MCP server、个性化 FSRS 权重)**被刻意冻结**,
+直到核心闭环对一个真实学习者被证明"黏得住"(一条轨道 ≥10 张卡、≥3 个复习日)。对着空卡组堆功能,正是本项目
+刻意规避的失败模式。全部设计见 [`plans/specs/2026-06-22-feature-designs.md`](plans/specs/2026-06-22-feature-designs.md)。
+
+## 状态与诚实说明
+
+这是 **alpha**。已扎实并测过的:确定性引擎、完整状态机、每个 CLI、所有文件产物——端到端覆盖每个流程
+(44 个单元测试 + 一次从零验收,全绿)。只有真实会话能证明的:**教学对话本身的质量**(取决于宿主模型)。
+它还没经过数月、多学科的实战检验——那是下一个里程碑,不是构建任务。
+
+## 贡献
+
+欢迎 issue 与 PR。请守住不变量:内核保持纯标准库零依赖;markdown 文件是唯一真实来源(`registry.json`
+是可重建缓存);卡片保持兼容 Obsidian 间隔复习;先教学后出卡;未经学习者批准不落库。新教学法就是一个新的
+`methods/*.md`。提交前请跑 `python3 -m unittest tests.test_fsrs tests.test_registry`。
 
 ## 致谢
 
 - `methods/learning-science.md` 的教学法改编自 [Matt Pocock 的 `teach` skill](https://github.com/mattpocock/skills)
-  （MIT，© 2026 Matt Pocock）——按 learn-everything 的 track/card/FSRS 模型重写。
-- FSRS 排程遵循 [open-spaced-repetition/py-fsrs](https://github.com/open-spaced-repetition/py-fsrs)
-  （FSRS-6）；卡片兼容 [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition)。
+  (MIT,© 2026 Matt Pocock)——按 learn-everything 的 track/card/FSRS 模型重写。
+- FSRS 排程遵循 [open-spaced-repetition/py-fsrs](https://github.com/open-spaced-repetition/py-fsrs)(FSRS-6);
+  卡片兼容 [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition);
+  Obsidian 内体验由 [Claudian](https://github.com/YishenTu/claudian) 提供。
 
 ## 许可证
 
-MIT——见 [LICENSE](LICENSE)。
+MIT —— 见 [LICENSE](LICENSE)。

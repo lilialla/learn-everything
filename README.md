@@ -4,6 +4,18 @@
   <img src="assets/learn-everything-logo-anime-girl.png" alt="learn-everything logo" width="220">
 </p>
 
+<p align="center"><b>English</b> · <a href="README.zh.md">中文</a></p>
+
+<p align="center">
+  <a href="https://github.com/lilialla/learn-everything/actions/workflows/ci.yml"><img src="https://github.com/lilialla/learn-everything/actions/workflows/ci.yml/badge.svg" alt="tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha">
+  <img src="https://img.shields.io/badge/engine-Python%20stdlib%20%C2%B7%20zero%20deps-3776AB?logo=python&logoColor=white" alt="engine: Python stdlib, zero deps">
+  <img src="https://img.shields.io/badge/spaced%20repetition-FSRS--6-success" alt="spaced repetition: FSRS-6">
+  <img src="https://img.shields.io/badge/runs%20in-Obsidian-7C3AED?logo=obsidian&logoColor=white" alt="runs in: Obsidian">
+  <a href="#contributing"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"></a>
+</p>
+
 **An AI tutor that teaches you many subjects at once — and remembers.** Talk to it in plain
 language inside Obsidian; it teaches one concept at a time, captures what you understood (and
 where you stumbled), and quietly schedules spaced reviews so it actually sticks.
