@@ -93,11 +93,11 @@ status   : python3 scripts/registry.py status [--today YYYY-MM-DD]      # board 
 plan-day : python3 scripts/registry.py plan-day [--minutes N] [--energy low|normal|high]
 create   : python3 scripts/registry.py create-track --id <id> --title <t> --mode domain --pedagogy <p> [--goal "..."]
 gate     : python3 scripts/registry.py ingest-check --track <id>        # is this track ready to learn into?
-add cards: echo '<json array>' | python3 scripts/registry.py add-cards --track <id>
+add cards: echo '<json array>' | python3 scripts/registry.py add-cards --track <id>   # each card may carry "source"
 due      : python3 scripts/registry.py due [--track <id|all>]
 grade    : python3 scripts/registry.py grade --track <id> --card <card-id> --grade <1-4>
 log      : python3 scripts/registry.py log --track <id> --what "..." [--next "..."] [--no-cards-reason "..."]
-trace?   : python3 scripts/registry.py session-check --track <id>       # did this session leave a card or a reason?
+trace?   : python3 scripts/registry.py session-check --strict --track <id>   # full close gate (card+log+next+CONTEXT today)
 progress : python3 scripts/registry.py progress [--track <id|all>]      # total / graduated / 7-day accuracy
 logQ     : python3 scripts/registry.py log-question --track <id> --concept "<C>" --question "<Q>" [--term "<T>"]
 questions: python3 scripts/registry.py questions [--track <id|all>]      # where they asked most, ranked by concept
@@ -210,9 +210,10 @@ the full "why" to a later nudge (don't gate the first lesson on it).
 - Once they genuinely understand, offer a **small** set of cards from the points they had to work
   for (a few per concept, a mix of fact / why-how / apply). If more than ~6, save the full set to
   `tracks/<id>/notes/<date>-card-proposal.md` and summarize in chat. **Write nothing yet.**
-- Ask which to keep / edit / drop. **Persist only after they say yes:** `add-cards` (batch),
-  then write the source + notes into `notes/`, then update the track's `plan.md` map (a
-  `## Sessions` bullet + the new card links).
+- Ask which to keep / edit / drop. **Persist only after they say yes:** `add-cards` (batch) — give
+  each card a `source` field (the `…-source.md`/`…-lesson.md` note, a url, or a page/anchor) so the
+  card is always traceable back to where the fact came from; then write the source + notes into
+  `notes/`, then update the track's `plan.md` map (a `## Sessions` bullet + the new card links).
 - **Always close the session** (see "Session close" below). Never end with no card and no reason.
 
 ### Choosing how to teach (internal — present only the outcome)
@@ -259,26 +260,34 @@ learner predict before you reveal, and self-review at session end (this is also 
 ## Session close (mandatory — this is how memory survives)
 
 At the end of EVERY teaching or review session, before you say you're done:
-1. **Update `tracks/<id>/CONTEXT.md`** (create if missing) — overwrite its four sections:
-   *Where you are* (one line), *What you've learned* (running bullets), *Known sticking points*
-   (**from the misconceptions you captured this session** — never leave this empty if the learner
-   stumbled), *Open threads* (what to pick up next). For any misconception that got **corrected**
-   this session, also append a dated `tracks/<id>/learning-records/NNNN-slug.md` (what was wrong →
-   what's right → why it matters next time) — the traceable detail layer behind the digest.
-2. **Log it:** `log --track <id> --what "<what we did>" --next "<the next step>"`. Never leave
-   both the next step and the log empty. If you genuinely made no cards this session, add
+1. **Update `tracks/<id>/CONTEXT.md`** (create if missing). Put `last_updated: <today's date>` as
+   the first line, then overwrite its four sections: *Where you are* (one line), *What you've
+   learned* (running bullets), *Known sticking points* (**from the misconceptions you captured this
+   session** — never leave this empty if the learner stumbled), *Open threads* (what to pick up
+   next). Keep it a **digest, not a log**: if it grows past ~6000 chars, compress old resolved
+   sticking points into a one-line "resolved: …" and push the detail into `learning-records/`. For
+   any misconception that got **corrected** this session, append a dated
+   `tracks/<id>/learning-records/NNNN-slug.md` (what was wrong → what's right → why it matters next
+   time) — the traceable detail layer behind the digest.
+2. **Log it:** `log --track <id> --what "<what we did>" --next "<the next step>"`. Always set
+   `--next` (RESUME must never be blank). If you genuinely made no cards this session, add
    `--no-cards-reason "<why>"`.
-3. **Verify the trace:** run `session-check --track <id>`. If `ok:false`, you left nothing behind
-   — make a card or record a reason, then you're done.
+3. **Verify the trace (strict):** run `session-check --strict --track <id>` (add `--review` for a
+   pure review/admin session). It checks all four at once — a card-or-reason, a Log row today, a
+   `next_action`, and a CONTEXT.md updated today — and lists exactly what's `missing`. Do not
+   declare done until `ok:true`. (Heed any `warnings`, e.g. an over-budget CONTEXT.md.)
 
 ## CONTEXT.md (the per-track memory digest)
-Plain markdown at `tracks/<id>/CONTEXT.md`, four fixed headings. It is the source of truth for
-"what's in this learner's head on this track"; RESUME and STATUS read it. It is NOT engine state —
-don't put it in registry.json. Two layers of learner memory, both written by you (no CLI):
-**CONTEXT.md** = the rolling digest (overwritten each session); **`learning-records/NNNN-slug.md`**
-= dated, append-only insights (each corrected misconception, prior knowledge disclosed, mastery
-shown). `methods/learner-model.md` persistence writes to both; together they make the learner's
-path — including every stumble — fully traceable across sessions.
+Plain markdown at `tracks/<id>/CONTEXT.md`: a `last_updated: <date>` first line, then four fixed
+headings. It is the source of truth for "what's in this learner's head on this track"; RESUME and
+STATUS read it. It is NOT engine state — don't put it in registry.json. **Keep it bounded** (a
+digest, ~6000 chars max): when it grows, summarize old resolved points into one line and move the
+detail to `learning-records/` — this prevents context overload as a track runs for months. Two
+layers of learner memory, both written by you (no CLI): **CONTEXT.md** = the rolling digest
+(overwritten each session); **`learning-records/NNNN-slug.md`** = dated, append-only insights (each
+corrected misconception, prior knowledge disclosed, mastery shown). `methods/learner-model.md`
+persistence writes to both; together they make the learner's path — including every stumble — fully
+traceable across sessions.
 
 ## Reminders
 - **Two kinds of memory, both are mechanisms — not optional:** (1) the *learner's* path —

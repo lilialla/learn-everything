@@ -310,6 +310,38 @@ def log_row_count(track_id: str, root: Path | None = None) -> int:
     return n
 
 
+def log_dates(track_id: str, root: Path | None = None) -> set[str]:
+    """The set of dates appearing in the '## Log' table's first column.
+
+    Used to tell a real teaching/review Log row (dated today) apart from
+    create_track's initial `last_active` stamp, which is not a session trace.
+    """
+    path = track_md_path(track_id, root)
+    if not path.exists():
+        return set()
+    lines = path.read_text(encoding="utf-8").splitlines()
+    in_log = False
+    seen_sep = False
+    out: set[str] = set()
+    for line in lines:
+        s = line.strip()
+        if s.lower() == "## log":
+            in_log = True
+            continue
+        if not in_log:
+            continue
+        if s.startswith("## "):
+            break
+        if s.startswith("|") and set(s) <= set("|-: "):
+            seen_sep = True
+            continue
+        if seen_sep and s.startswith("|"):
+            first = s.strip("|").split("|", 1)[0].strip()
+            if first:
+                out.add(first)
+    return out
+
+
 def _split_track_md(text: str) -> tuple[list[str], list[str]]:
     """Return (frontmatter_lines_with_fences, body_lines) split at 2nd '---'."""
     lines = text.splitlines()
@@ -524,7 +556,12 @@ def next_card_id(track_id: str, root: Path | None = None) -> str:
 
 
 def _build_card_md(
-    card_id: str, question: str, answer: str, tags: list[str], track_id: str
+    card_id: str,
+    question: str,
+    answer: str,
+    tags: list[str],
+    track_id: str,
+    source: str = "",
 ) -> str:
     """Card body, compatible with the Obsidian spaced-repetition plugin.
 
@@ -532,12 +569,18 @@ def _build_card_md(
     subdeck tag, so cards review natively inside Obsidian while staying clean,
     human-readable markdown. FSRS scheduling state lives in review-state.json,
     never in the card file, so cards can be edited/exported freely.
+
+    `source` (optional) records provenance — the note/file/url (and page/anchor)
+    this card was distilled from — so a learner can always trace a card back to
+    where the fact came from. Emitted as a frontmatter line only when present.
     """
     tag_line = "[" + ", ".join(tags) + "]"
+    source_line = f"source: {_scalar_to_yaml(source.strip())}\n" if source.strip() else ""
     return (
         "---\n"
         f"id: {card_id}\n"
         f"tags: {tag_line}\n"
+        f"{source_line}"
         "---\n"
         f"#flashcards/{track_id}\n"
         "\n"
@@ -1003,8 +1046,13 @@ def add_card(
     tags: list[str] | None = None,
     today: str | None = None,
     root: Path | None = None,
+    source: str = "",
 ) -> str:
-    """Allocate id, write card file, seed review-state. Returns new card id."""
+    """Allocate id, write card file, seed review-state. Returns new card id.
+
+    `source` records where the card came from (note path / url / page) for
+    traceability; optional.
+    """
     if not track_md_path(track_id, root).exists():
         raise ValueError(f"unknown track '{track_id}'")
     today = _today_str(today)
@@ -1013,7 +1061,7 @@ def add_card(
     cards_dir(track_id, root).mkdir(parents=True, exist_ok=True)
     _atomic_write_text(
         cards_dir(track_id, root) / f"{card_id}.md",
-        _build_card_md(card_id, question, answer, tags, track_id),
+        _build_card_md(card_id, question, answer, tags, track_id, source),
     )
     state = load_review_state(track_id, root, on_corrupt="raise")
     state[card_id] = _seed_new_card_state(today)
@@ -1059,9 +1107,12 @@ def add_cards(
             if not q or not a:
                 raise ValueError(f"card #{i} is missing question or answer")
             tags = card.get("tags") or []
+            source = (card.get("source") or "").strip()
             card_id = f"card-{start + i:04d}"
             path = cdir / f"{card_id}.md"
-            _atomic_write_text(path, _build_card_md(card_id, q, a, list(tags), track_id))
+            _atomic_write_text(
+                path, _build_card_md(card_id, q, a, list(tags), track_id, source)
+            )
             written.append(path)
             state[card_id] = _seed_new_card_state(today)
             new_ids.append(card_id)
@@ -1227,6 +1278,117 @@ def session_check(track_id: str, root: Path | None = None) -> dict:
             "this track has 0 cards and no logged reason — distill at least one card "
             "from what was taught, or run `log --no-cards-reason \"<why>\"`"
         ),
+    }
+
+
+# A CONTEXT.md digest should stay a SMALL, bounded reconstruction of the learner
+# (not an ever-growing log). Over this many chars, session-close warns the skill
+# to summarize old sticking points instead of appending. ~6000 chars ≈ 1.5k tokens.
+CONTEXT_MAX_CHARS = 6000
+
+
+def context_md_path(track_id: str, root: Path | None = None) -> Path:
+    """Per-track memory digest the skill reads first to reconstruct context."""
+    return track_dir(track_id, root) / "CONTEXT.md"
+
+
+def context_check(
+    track_id: str, today: str | None = None, root: Path | None = None
+) -> dict:
+    """Is the per-track CONTEXT.md present, fresh (updated today), and bounded?
+
+    The skill is expected to write a `last_updated: YYYY-MM-DD` line at the top of
+    CONTEXT.md each session. This reads that marker (no write) and flags an
+    over-budget digest so context never silently grows unbounded.
+    """
+    today = _today_str(today)
+    path = context_md_path(track_id, root)
+    if not path.exists():
+        return {
+            "exists": False, "fresh": False, "last_updated": None,
+            "size_chars": 0, "over_budget": False,
+        }
+    text = path.read_text(encoding="utf-8")
+    last_updated = None
+    for line in text.splitlines()[:15]:
+        s = line.strip().lstrip("-* ").lower()
+        if s.startswith("last_updated:") or s.startswith("last updated:"):
+            last_updated = line.split(":", 1)[1].strip()
+            break
+    size = len(text)
+    return {
+        "exists": True,
+        "fresh": last_updated == today,
+        "last_updated": last_updated,
+        "size_chars": size,
+        "over_budget": size > CONTEXT_MAX_CHARS,
+    }
+
+
+def session_close_check(
+    track_id: str,
+    taught: bool = True,
+    today: str | None = None,
+    root: Path | None = None,
+) -> dict:
+    """Strict, non-skippable session-close gate (the root-cause fix for memory).
+
+    A teaching session is only "closed" if it left a durable, resumable trace:
+      1. a card OR a logged no-cards reason  (existing `session_check`)
+      2. a Log row dated today               (last_active == today)
+      3. a `next_action` pointer set         (so RESUME isn't a blank)
+      4. a CONTEXT.md updated today          (the memory digest is current)
+    Plus a non-blocking warning if CONTEXT.md is over the size budget.
+
+    Pass `taught=False` for a pure review/admin session: only requirement (3) the
+    next_action and a Log row are enforced (no new card is expected from review).
+    Read-only over existing artifacts; returns what's missing so the skill can fix
+    it before declaring the session done.
+    """
+    if not track_md_path(track_id, root).exists():
+        raise ValueError(f"unknown track '{track_id}'")
+    today = _today_str(today)
+    meta = read_track(track_id, root)
+    ctx = context_check(track_id, today, root)
+    base = session_check(track_id, root)
+
+    checks = {
+        "card_or_reason": base["ok"] if taught else True,
+        "logged_today": today in log_dates(track_id, root),
+        "next_action_set": bool(meta.get("next_action")),
+        "context_fresh": ctx["exists"] and ctx["fresh"],
+    }
+    missing: list[str] = []
+    if not checks["card_or_reason"]:
+        missing.append(
+            "no card and no logged reason — add a card or `log --no-cards-reason \"<why>\"`"
+        )
+    if not checks["logged_today"]:
+        missing.append("no Log row dated today — run `log --track <id> --what \"...\" --next \"...\"`")
+    if not checks["next_action_set"]:
+        missing.append("next_action is empty — set `--next \"<what to do next time>\"` when you log")
+    if not checks["context_fresh"]:
+        if not ctx["exists"]:
+            missing.append("CONTEXT.md missing — write the memory digest (with `last_updated: <today>`)")
+        else:
+            missing.append(
+                f"CONTEXT.md not updated today (last_updated: {ctx['last_updated']}) — refresh it"
+            )
+
+    warnings: list[str] = []
+    if ctx["over_budget"]:
+        warnings.append(
+            f"CONTEXT.md is {ctx['size_chars']} chars (> {CONTEXT_MAX_CHARS}); "
+            "summarize old sticking points into a short 'resolved' line so it stays a digest"
+        )
+
+    return {
+        "ok": all(checks.values()),
+        "taught": taught,
+        "checks": checks,
+        "missing": missing,
+        "warnings": warnings,
+        "context": ctx,
     }
 
 
@@ -1470,6 +1632,16 @@ def build_parser() -> argparse.ArgumentParser:
         "session-check", help="did this session leave a card or a logged reason?"
     )
     sp.add_argument("--track", required=True)
+    sp.add_argument(
+        "--strict",
+        action="store_true",
+        help="full session-close gate: card/reason + log-today + next_action + fresh CONTEXT.md",
+    )
+    sp.add_argument(
+        "--review",
+        action="store_true",
+        help="with --strict: a review/admin session (no new card expected)",
+    )
 
     sp = sub.add_parser(
         "progress", help="3 retention numbers per track (total / graduated / 7-day accuracy)"
@@ -1496,6 +1668,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--answer", required=True)
     sp.add_argument("--tags", default="")
     sp.add_argument("--today", default=None)
+    sp.add_argument(
+        "--source", default="", help="provenance: note path / url / page this card came from"
+    )
 
     sp = sub.add_parser(
         "add-cards",
@@ -1561,7 +1736,10 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "ingest-check":
             _print_json(ingest_check(args.track))
         elif args.command == "session-check":
-            _print_json(session_check(args.track))
+            if args.strict:
+                _print_json(session_close_check(args.track, taught=not args.review))
+            else:
+                _print_json(session_check(args.track))
         elif args.command == "progress":
             _print_json(progress(args.track, args.today))
         elif args.command == "log-question":
@@ -1582,6 +1760,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.answer,
                     tags=tags,
                     today=args.today,
+                    source=args.source,
                 )
             )
         elif args.command == "add-cards":

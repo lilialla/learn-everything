@@ -536,6 +536,91 @@ class RegistryTestCase(unittest.TestCase):
         registry.add_card("rust", "Q", "A", today=self.today, root=self.root)
         self.assertTrue(registry.session_check("rust", self.root)["ok"])
 
+    def _write_context(self, track_id, last_updated, body="ok"):
+        registry.context_md_path(track_id, self.root).write_text(
+            f"# CONTEXT\n\nlast_updated: {last_updated}\n\n{body}\n", encoding="utf-8"
+        )
+
+    def test_session_close_check_strict_requires_full_trace(self):
+        self._make_track()
+        # nothing done yet -> not ok, several things missing
+        res = registry.session_close_check("python", today=self.today, root=self.root)
+        self.assertFalse(res["ok"])
+        self.assertFalse(res["checks"]["card_or_reason"])
+        self.assertFalse(res["checks"]["logged_today"])
+        self.assertFalse(res["checks"]["next_action_set"])
+        self.assertFalse(res["checks"]["context_fresh"])
+        # add a card, log today with a next_action, write a fresh CONTEXT.md
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        registry.log_entry(
+            "python", "taught closures", next_action="practice closures",
+            today=self.today, root=self.root,
+        )
+        self._write_context("python", self.today)
+        res2 = registry.session_close_check("python", today=self.today, root=self.root)
+        self.assertTrue(res2["ok"], res2["missing"])
+        self.assertEqual(res2["missing"], [])
+
+    def test_session_close_check_review_session_needs_no_card(self):
+        self._make_track()
+        registry.log_entry(
+            "python", "reviewed cards", next_action="continue tomorrow",
+            no_cards_reason=None, today=self.today, root=self.root,
+        )
+        self._write_context("python", self.today)
+        # taught=False: a card is not required, but log/next_action/context are
+        res = registry.session_close_check(
+            "python", taught=False, today=self.today, root=self.root
+        )
+        self.assertTrue(res["ok"], res["missing"])
+
+    def test_session_close_check_stale_context_blocks(self):
+        self._make_track()
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        registry.log_entry(
+            "python", "x", next_action="y", today=self.today, root=self.root
+        )
+        self._write_context("python", self.yesterday)  # not today
+        res = registry.session_close_check("python", today=self.today, root=self.root)
+        self.assertFalse(res["ok"])
+        self.assertFalse(res["checks"]["context_fresh"])
+
+    def test_context_check_over_budget_warns(self):
+        self._make_track()
+        big = "x" * (registry.CONTEXT_MAX_CHARS + 10)
+        self._write_context("python", self.today, body=big)
+        ctx = registry.context_check("python", self.today, self.root)
+        self.assertTrue(ctx["exists"])
+        self.assertTrue(ctx["fresh"])
+        self.assertTrue(ctx["over_budget"])
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        registry.log_entry("python", "x", next_action="y", today=self.today, root=self.root)
+        res = registry.session_close_check("python", today=self.today, root=self.root)
+        self.assertTrue(res["ok"])  # over-budget is a warning, not a blocker
+        self.assertTrue(any("CONTEXT.md is" in w for w in res["warnings"]))
+
+    def test_card_records_source_provenance(self):
+        self._make_track()
+        registry.add_card(
+            "python", "Q", "A", today=self.today, root=self.root,
+            source="notes/2026-06-22-closures-source.md#p3",
+        )
+        text = (self.root / "tracks" / "python" / "cards" / "card-0001.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("source: notes/2026-06-22-closures-source.md#p3", text)
+        # batch path carries source too; omitting source emits no source line
+        registry.add_cards(
+            "python",
+            [{"question": "Q2", "answer": "A2", "source": "https://example.com/x"},
+             {"question": "Q3", "answer": "A3"}],
+            today=self.today, root=self.root,
+        )
+        t2 = (self.root / "tracks" / "python" / "cards" / "card-0002.md").read_text("utf-8")
+        t3 = (self.root / "tracks" / "python" / "cards" / "card-0003.md").read_text("utf-8")
+        self.assertIn("source: https://example.com/x", t2)
+        self.assertNotIn("source:", t3)
+
     def test_status_due_total_and_resume_pointer_missing(self):
         # taught earlier, active later, but no next_action and no Log row -> pointer missing
         old = _iso(date(2026, 6, 12))
