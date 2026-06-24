@@ -42,6 +42,7 @@ def repo_root() -> Path:
 # ---------------------------------------------------------------------------
 
 STALE_THRESHOLD_DAYS = 7  # a track idle longer than this is "stale"
+LEECH_LAPSES = 3  # a card that has lapsed this many times is a "leech" — re-teach, don't re-quiz
 URGENT_DAYS = 3  # a deadline within this many days is force-scheduled
 SEC_PER_CARD = 40  # review-time estimate per due card
 MAX_REVIEW_BLOCK_MIN = 25  # cap one track's review block so a backlog can't eat the day
@@ -806,6 +807,70 @@ def _cards_due_today(track_id: str, today: str, root: Path | None = None) -> int
     return count
 
 
+def _count_leeches(track_id: str, root: Path | None = None) -> int:
+    state = load_review_state(track_id, root)
+    n = 0
+    for card_id in list_card_ids(track_id, root):
+        entry = state.get(card_id)
+        if isinstance(entry, dict) and (entry.get("lapses") or 0) >= LEECH_LAPSES:
+            n += 1
+    return n
+
+
+def leeches(track_id: str, root: Path | None = None) -> dict:
+    """Cards that keep failing (lapses >= LEECH_LAPSES) — re-teach, don't re-quiz.
+
+    Returns the offending cards with their lapse/rep counts and question text so
+    the skill can offer a fresh explanation + a clearer replacement card.
+    """
+    if not track_md_path(track_id, root).exists():
+        raise ValueError(f"unknown track '{track_id}'")
+    state = load_review_state(track_id, root)
+    out = []
+    for card_id in list_card_ids(track_id, root):
+        entry = state.get(card_id)
+        if not isinstance(entry, dict):
+            continue
+        if (entry.get("lapses") or 0) >= LEECH_LAPSES:
+            out.append({
+                "card_id": card_id,
+                "lapses": entry.get("lapses"),
+                "reps": entry.get("reps"),
+                "question": read_card_question(track_id, card_id, root),
+            })
+    out.sort(key=lambda c: (-(c["lapses"] or 0), c["card_id"]))
+    return {"track": track_id, "count": len(out), "leeches": out}
+
+
+def nudge(today: str | None = None, root: Path | None = None) -> str:
+    """ONE plain human line for a daily note / cron / scheduled agent.
+
+    No JSON — this is what a learner sees outside the app to know it's time to
+    review. Surfaces the due count, the leech count, and the urgent-deadline
+    count so re-engagement doesn't depend on the learner remembering to ask.
+    """
+    board = status_board(today, root)
+    due = board["due_total"]
+    n_tracks = board["tracks_with_due"]
+    leech_total = sum(t.get("leeches", 0) for t in board["tracks"])
+    urgent = sum(
+        1 for t in board["tracks"]
+        if t["days_to_deadline"] is not None and 0 <= t["days_to_deadline"] < URGENT_DAYS
+    )
+    if due == 0 and urgent == 0:
+        return "learn-everything: nothing due today — a good day to learn something new."
+    parts = []
+    if due:
+        s = "card" if due == 1 else "cards"
+        t = "subject" if n_tracks == 1 else "subjects"
+        parts.append(f"{due} {s} due across {n_tracks} {t}")
+    if urgent:
+        parts.append(f"{urgent} with a deadline in <{URGENT_DAYS}d")
+    if leech_total:
+        parts.append(f"{leech_total} to re-teach")
+    return "learn-everything: " + "; ".join(parts) + " — open it and ask “what should I do?”"
+
+
 def _due_le(due: str, today: str) -> bool:
     """True if due <= today (string ISO dates)."""
     try:
@@ -856,6 +921,7 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
                 "days_to_deadline": days_to_deadline,
                 "cards_due_today": _cards_due_today(track_id, today, root),
                 "cards_total": cards_total,
+                "leeches": _count_leeches(track_id, root),
                 "last_active": last_active,
                 "stale_days": stale_days,
                 "stale": stale,
@@ -882,10 +948,12 @@ def status_board(today: str | None = None, root: Path | None = None) -> dict:
     )
     due_total = sum((t["cards_due_today"] or 0) for t in board)
     tracks_with_due = sum(1 for t in board if (t["cards_due_today"] or 0) > 0)
+    leech_total = sum((t.get("leeches") or 0) for t in board)
     return {
         "today": today,
         "due_total": due_total,
         "tracks_with_due": tracks_with_due,
+        "leech_total": leech_total,
         "tracks": board,
     }
 
@@ -1620,6 +1688,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("status", help="print status board")
     sp.add_argument("--today", default=None)
 
+    sp = sub.add_parser(
+        "nudge",
+        help="ONE plain human line of what's due (for a daily note / cron / scheduled agent)",
+    )
+    sp.add_argument("--today", default=None)
+
+    sp = sub.add_parser(
+        "leeches", help="cards that keep failing (lapses >= 3) — re-teach, don't re-quiz"
+    )
+    sp.add_argument("--track", required=True)
+
     sp = sub.add_parser("next-card-id", help="print next card id for a track")
     sp.add_argument("--track", required=True)
 
@@ -1731,6 +1810,10 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(rebuild_registry())
         elif args.command == "status":
             _print_json(status_board(args.today))
+        elif args.command == "nudge":
+            print(nudge(args.today))
+        elif args.command == "leeches":
+            _print_json(leeches(args.track))
         elif args.command == "next-card-id":
             print(next_card_id(args.track))
         elif args.command == "ingest-check":

@@ -91,9 +91,9 @@ It teaches you one concept at a time, writes your notes into the vault as you go
 reviews so things actually stick.
 
 **Coming back later:** open the vault and ask *"what should I do today?"* — it leads with how many
-cards are due across everything. (Want a reminder without opening it? Put this one line in a Daily
-Note or a scheduled task to print your due count — no background daemon:
-`python3 scripts/registry.py status`.)
+cards are due across everything. (Want a reminder without opening it? `python3 scripts/registry.py
+nudge` prints one plain line — *"learn-everything: 7 cards due across 3 subjects … "* — drop it in a
+Daily Note, a shell login, or a scheduled task/cron. No background daemon.)
 
 ## How it works
 

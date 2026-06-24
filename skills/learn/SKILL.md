@@ -95,6 +95,8 @@ create   : python3 scripts/registry.py create-track --id <id> --title <t> --mode
 gate     : python3 scripts/registry.py ingest-check --track <id>        # is this track ready to learn into?
 add cards: echo '<json array>' | python3 scripts/registry.py add-cards --track <id>   # each card may carry "source"
 due      : python3 scripts/registry.py due [--track <id|all>]
+nudge    : python3 scripts/registry.py nudge                            # ONE human line of what's due (daily-note/cron)
+leeches  : python3 scripts/registry.py leeches --track <id>            # cards that keep failing — re-teach, don't re-quiz
 grade    : python3 scripts/registry.py grade --track <id> --card <card-id> --grade <1-4>
 log      : python3 scripts/registry.py log --track <id> --what "..." [--next "..."] [--no-cards-reason "..."]
 trace?   : python3 scripts/registry.py session-check --strict --track <id>   # full close gate (card+log+next+CONTEXT today)
@@ -251,9 +253,9 @@ learner predict before you reveal, and self-review at session end (this is also 
 
 1. Run `due --track all` (or one track). Nothing due → say so warmly and offer to learn or plan.
 2. For each due card: show the question, let them answer, then reveal the stored answer — guided
-   by `methods/active-recall.md`. If a card **keeps failing** (its `lapses`/`reps` from `due` show
-   ≥3 lapses or 2 straight misses), don't just re-quiz — re-teach the idea by questioning, and
-   offer a clearer replacement card.
+   by `methods/active-recall.md`. Run `leeches --track <id>` first: any card it lists **keeps
+   failing** (≥3 lapses) — don't just re-quiz it, **re-teach** the idea by questioning and offer a
+   clearer replacement card.
 3. After each, ask them to rate how it felt (1 hard … 4 easy) and record it with `grade`. Tell
    them in human terms when it'll come back ("nice — you won't see this for ~5 days").
 4. At the end, show **progress** (`progress --track <id>`) in plain words: "{cards_total} cards,

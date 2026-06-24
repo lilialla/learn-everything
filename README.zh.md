@@ -79,7 +79,8 @@ learn-everything 是一个装进任意支持 Skill 的 AI 助手的技能,用大
 它一次教一个概念,边教边把笔记写进你的库,并安排复习让知识真正留下。
 
 **下次回来:** 打开库问一句*"今天我该学什么?"*——它会先告诉你所有学科一共多少卡到期。(想不打开也被提醒?
-把这一行放进 Daily Note 或定时任务,打印到期数——无需后台守护进程:`python3 scripts/registry.py status`。)
+`python3 scripts/registry.py nudge` 打印一行大白话——*"learn-everything: 7 cards due across 3 subjects …"*
+——放进 Daily Note、shell 登录提示或定时任务/cron 即可。无需后台守护进程。)
 
 ## 工作原理
 

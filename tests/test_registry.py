@@ -621,6 +621,33 @@ class RegistryTestCase(unittest.TestCase):
         self.assertIn("source: https://example.com/x", t2)
         self.assertNotIn("source:", t3)
 
+    def test_leeches_flags_repeatedly_failing_cards(self):
+        self._make_track()
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        registry.add_card("python", "Q2", "A2", today=self.today, root=self.root)
+        state = registry.load_review_state("python", self.root, on_corrupt="raise")
+        state["card-0001"]["lapses"] = 3  # a leech
+        registry.save_review_state("python", state, self.root)
+        res = registry.leeches("python", self.root)
+        self.assertEqual(res["count"], 1)
+        self.assertEqual(res["leeches"][0]["card_id"], "card-0001")
+        # surfaced on the status board too
+        board = registry.status_board(self.today, self.root)
+        self.assertEqual(board["leech_total"], 1)
+        py = next(t for t in board["tracks"] if t["id"] == "python")
+        self.assertEqual(py["leeches"], 1)
+
+    def test_nudge_oneline_due_and_empty(self):
+        self._make_track()
+        # nothing due yet -> friendly empty line
+        empty = registry.nudge(self.today, self.root)
+        self.assertIn("nothing due", empty.lower())
+        # a due card tomorrow -> one line naming the count
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        line = registry.nudge(self.tomorrow, self.root)
+        self.assertIn("due across", line)
+        self.assertIn("1", line)
+
     def test_status_due_total_and_resume_pointer_missing(self):
         # taught earlier, active later, but no next_action and no Log row -> pointer missing
         old = _iso(date(2026, 6, 12))
