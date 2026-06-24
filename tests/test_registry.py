@@ -571,5 +571,30 @@ class RegistryTestCase(unittest.TestCase):
         self.assertEqual(p["accuracy_7d"], 1.0)
 
 
+    # -- quantitative question tracking ----------------------------------
+
+    def test_questions_log_and_stats_rank_by_concept(self):
+        self._make_track()
+        registry.log_question(
+            "python", "decorators", "what is a closure?",
+            term="closure", today=self.today, root=self.root,
+        )
+        registry.log_question(
+            "python", "decorators", "how does @ work?", today=self.today, root=self.root
+        )
+        registry.log_question(
+            "python", "typing", "what is a Protocol?", today=self.today, root=self.root
+        )
+        st = registry.questions_stats("python", self.today, self.root)["tracks"][0]
+        self.assertEqual(st["total"], 3)
+        top = st["by_concept"][0]
+        self.assertEqual(top["concept"], "decorators")
+        self.assertEqual(top["count"], 2)
+        self.assertIn("closure", top["terms"])
+        self.assertFalse(top["hot"])  # 2 < 3
+        with self.assertRaises(ValueError):
+            registry.questions_stats("nope", self.today, self.root)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1306,6 +1306,96 @@ def progress(
     return {"today": today, "tracks": rows}
 
 
+def questions_log_path(track_id: str, root: Path | None = None) -> Path:
+    return track_dir(track_id, root) / "questions-log.jsonl"
+
+
+def log_question(
+    track_id: str,
+    concept: str,
+    question: str,
+    term: str | None = None,
+    today: str | None = None,
+    root: Path | None = None,
+) -> dict:
+    """Append one ad-hoc learner question to questions-log.jsonl (append-only).
+
+    `concept` is the clustering key (what the question is about); `term` is the
+    specific word, if any. This is the quantitative layer behind the markdown
+    consolidation — it lets `questions` rank where the learner asked most.
+    Best-effort: a logging failure must not break the conversation.
+    """
+    if not track_md_path(track_id, root).exists():
+        raise ValueError(f"unknown track '{track_id}'")
+    today = _today_str(today)
+    entry = {
+        "date": today,
+        "concept": (concept or "(uncategorized)").strip() or "(uncategorized)",
+        "question": (question or "").strip(),
+    }
+    if term:
+        entry["term"] = term.strip()
+    try:
+        path = questions_log_path(track_id, root)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as exc:  # pragma: no cover - defensive
+        _warn(f"could not append questions-log for '{track_id}' ({exc}); continuing")
+    return entry
+
+
+def questions_stats(
+    track: str = "all", today: str | None = None, root: Path | None = None
+) -> dict:
+    """Where did the learner ask most? Per-concept counts ranked desc.
+
+    Pure read over questions-log.jsonl. The drill-down heatmap: a concept asked
+    many times is a weak/important spot. Hot concepts (count >= 3) are flagged.
+    """
+    today = _today_str(today)
+    if track and track != "all":
+        if not track_md_path(track, root).exists():
+            raise ValueError(f"unknown track '{track}'")
+        track_ids = [track]
+    else:
+        track_ids = [rec["id"] for rec in rebuild_registry(root)["tracks"]]
+
+    rows = []
+    for tid in track_ids:
+        entries = []
+        path = questions_log_path(tid, root)
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        by_concept: dict[str, dict] = {}
+        for e in entries:
+            c = e.get("concept") or "(uncategorized)"
+            slot = by_concept.setdefault(
+                c, {"concept": c, "count": 0, "last_asked": None, "terms": []}
+            )
+            slot["count"] += 1
+            d = e.get("date")
+            if d and (slot["last_asked"] is None or d > slot["last_asked"]):
+                slot["last_asked"] = d
+            t = e.get("term")
+            if t and t not in slot["terms"]:
+                slot["terms"].append(t)
+        ranked = sorted(
+            by_concept.values(), key=lambda s: (-s["count"], s["concept"])
+        )
+        for s in ranked:
+            s["hot"] = s["count"] >= 3
+        rows.append({"track": tid, "total": len(entries), "by_concept": ranked})
+    return {"today": today, "tracks": rows}
+
+
 def ingest_check(track_id: str, root: Path | None = None) -> dict:
     """Deterministic pre-flight gate the `learn` skill MUST pass before INGEST.
 
@@ -1388,6 +1478,19 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--track", default="all")
     sp.add_argument("--today", default=None)
 
+    sp = sub.add_parser("log-question", help="record one ad-hoc learner question")
+    sp.add_argument("--track", required=True)
+    sp.add_argument("--concept", required=True, help="what the question is about (clustering key)")
+    sp.add_argument("--question", required=True)
+    sp.add_argument("--term", default=None, help="the specific term asked about, if any")
+    sp.add_argument("--today", default=None)
+
+    sp = sub.add_parser(
+        "questions", help="where the learner asked most — per-concept counts, ranked"
+    )
+    sp.add_argument("--track", default="all")
+    sp.add_argument("--today", default=None)
+
     sp = sub.add_parser("add-card", help="add a card to a track")
     sp.add_argument("--track", required=True)
     sp.add_argument("--question", required=True)
@@ -1462,6 +1565,15 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(session_check(args.track))
         elif args.command == "progress":
             _print_json(progress(args.track, args.today))
+        elif args.command == "log-question":
+            _print_json(
+                log_question(
+                    args.track, args.concept, args.question,
+                    term=args.term, today=args.today,
+                )
+            )
+        elif args.command == "questions":
+            _print_json(questions_stats(args.track, args.today))
         elif args.command == "add-card":
             tags = [t.strip() for t in args.tags.split(",") if t.strip()]
             print(

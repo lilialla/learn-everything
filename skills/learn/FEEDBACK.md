@@ -84,5 +84,6 @@
     「Questions & terms」；停顿/关闭时按概念聚类，反复追问的点升级为 CONTEXT 重点/卡点（带次数）、
     做卡、必要时写 learning-record。追问模式本身即数据。
   - `methods/learning-science.md` glossary 段新增「一问即入库、用熟即固化、问≥2次=卡点」。
-- **待评估（可选，未建）**：结构化 `questions-log.jsonl`（机器可数的"每个概念被问了几次"热力），
-  供量化追踪；当前先用 markdown 统合（CONTEXT 里带次数）满足"统合+可追溯"，量化日志按需再加。
+- **量化追踪（已建，用户要求直接加上）**：每轨 `questions-log.jsonl` + `log-question`（按 concept 记录
+  + 可选 term）+ `questions` 统计命令（按概念计数排行、≥3 标 `hot`）。markdown 统合（CONTEXT 带次数 +
+  glossary 查词地图）与机器可数热力两层并行，统合时用 `questions` 挑出最该做卡/重教的热点。测试 43→44。

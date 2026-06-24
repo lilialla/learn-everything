@@ -67,6 +67,10 @@ without a trace.**
   many times it came up*, turn the resolved ones into review cards, and write a `learning-records/`
   entry if a question exposed a real gap. The drill-down pattern itself is data — "you spent five
   questions on vector retrieval" tells both of you where the weak (or most important) spot is.
+  Also record each question quantitatively with `log-question --track <id> --concept "<C>"
+  --question "<Q>" [--term "<T>"]` (concept = the clustering key) — then `questions --track <id>`
+  gives the ranked heatmap of where they asked most (concepts with count ≥3 come back `hot:true`).
+  Use it at consolidation to pick which spots to turn into sticking points + cards.
 - **Sensible defaults, minimal questions.** Never ask the user to choose technical things
   (ids, modes, method names). Pick good defaults silently; ask only what genuinely shapes their
   learning (their goal, their current understanding).
@@ -94,6 +98,8 @@ grade    : python3 scripts/registry.py grade --track <id> --card <card-id> --gra
 log      : python3 scripts/registry.py log --track <id> --what "..." [--next "..."] [--no-cards-reason "..."]
 trace?   : python3 scripts/registry.py session-check --track <id>       # did this session leave a card or a reason?
 progress : python3 scripts/registry.py progress [--track <id|all>]      # total / graduated / 7-day accuracy
+logQ     : python3 scripts/registry.py log-question --track <id> --concept "<C>" --question "<Q>" [--term "<T>"]
+questions: python3 scripts/registry.py questions [--track <id|all>]      # where they asked most, ranked by concept
 ```
 Run commands from the repo root; **quote the cwd path** (spaces + non-ASCII). State lives in
 `tracks/<id>/`; `registry.json` is a rebuildable cache — never hand-edit state files.
