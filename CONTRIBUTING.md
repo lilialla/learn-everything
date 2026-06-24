@@ -9,7 +9,7 @@ No dependencies — the engine is Python standard library only.
 ```bash
 git clone https://github.com/lilialla/learn-everything.git
 cd learn-everything
-python3 -m unittest tests.test_fsrs tests.test_registry -v   # 46 tests, all should pass
+python3 -m unittest tests.test_fsrs tests.test_registry tests.test_structure -v   # 74 tests, all should pass
 ```
 
 ## Invariants (please don't break these)

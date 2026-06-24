@@ -6,6 +6,23 @@ informal during alpha.
 
 ## [Unreleased]
 
+- **Six-pillar audit follow-through — four substantive gaps closed:**
+  - **Memory now actually persists (P0).** A non-skippable close gate
+    (`session-check --strict`) requires a card-or-reason + a Log row today + a `next_action` + a
+    CONTEXT.md updated today; `context_check` bounds the digest (warns over ~6000 chars) so it can't
+    cause context overload. Cards/notes can carry a `source` for full provenance (trace any fact back
+    to its note/url/page).
+  - **Big books are taught point-by-point.** A curriculum state machine in `scripts/structure.py`
+    (`curriculum-build` → `next-chunk` → `mark` → `curriculum-status`, backed by per-track
+    `curriculum.json`) walks a whole book one chunk per session, resumable across days.
+  - **Review reaches the learner.** `registry.py nudge` prints one plain line of what's due (count +
+    urgent deadlines + leeches) for a Daily Note / shell / cron; `leeches` flags cards that keep
+    failing (lapses ≥ 3) to re-teach, surfaced on the status board.
+  - **Optional web search.** `adapters/web_search/` fills a gap / verifies a claim mid-lesson;
+    results return as UNTRUSTED data to weigh and cite (lazy backend, no core dependency).
+  - Honesty fixes: method selection is documented as the tutor's heuristic judgment (not an
+    algorithmic selector); the toolkit is described as 7 standalone + 3 composable layers + modes;
+    `tests.test_structure` added to CI; test count synced (→ 74).
 - **Docs repositioning.** Reframed the project as a host-agnostic **Skill** that installs into any
   Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others) — Obsidian + Claudian
   is now presented as one *recommended* setup, not a requirement. Removed comparative/"not a card
