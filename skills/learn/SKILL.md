@@ -194,8 +194,8 @@ the full "why" to a later nudge (don't gate the first lesson on it).
   `adapters/doc_ingest` (`extract`; route scanned PDFs through `mineru-ocr` / `case-files-to-md` per
   its `needs_ocr` handoff) → `python3 scripts/structure.py split` → then the **导读 reading-guide**
   (`methods/reading-guide.md`): a top-down map becomes the track's `plan.md` syllabus (HUMAN APPROVAL
-  before writing). On approval, build the curriculum:
-  `python3 scripts/structure.py curriculum-build --track <id> <source.md>`. Then teach it
+  before writing). On approval, build the curriculum (the track must already exist — `create-track`
+  first): `python3 scripts/structure.py curriculum-build --track <id> <source.md>`. Then teach it
   **one chunk per session**: `next-chunk --track <id>` gives you the next pending chunk *and its
   text* → teach only that → distill cards (each with `source: <work> p.N / chunk-NNNN`) → on approval
   `mark --track <id> --chunk <chunk-id>`; `curriculum-status --track <id>` shows % done. Don't try to

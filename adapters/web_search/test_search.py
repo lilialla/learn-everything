@@ -95,6 +95,22 @@ class TestWebSearch(unittest.TestCase):
         res = search("FSRS", max_results=1)
         self.assertEqual(res["count"], 1)
 
+    def test_title_aliases_normalized(self):
+        import sys as _sys
+        d = tempfile.mkdtemp()
+        script = Path(d) / "fake.py"
+        script.write_text(
+            "import json\n"
+            "print(json.dumps([{'name': 'Aliased', 'link': 'https://e.com/x',"
+            " 'description': 'snip'}]))\n",
+            encoding="utf-8",
+        )
+        os.environ["LEARN_WEB_SEARCH"] = f"{_sys.executable} {script}"
+        res = search("q")
+        self.assertEqual(res["results"][0]["title"], "Aliased")
+        self.assertEqual(res["results"][0]["url"], "https://e.com/x")
+        self.assertEqual(res["results"][0]["snippet"], "snip")
+
 
 def readiness_ready() -> bool:
     return bool(mod.readiness()["ready"])

@@ -685,6 +685,13 @@ class RegistryTestCase(unittest.TestCase):
         self.assertIn("due across", line)
         self.assertIn("1", line)
 
+    def test_nudge_includes_overdue_deadlines(self):
+        # a deadline in the past must still surface in the nudge (not just due cards)
+        self._make_track("exam", deadline=self.yesterday)
+        line = registry.nudge(self.today, self.root)
+        self.assertIn("deadline", line)
+        self.assertNotIn("nothing due", line.lower())
+
     def test_status_due_total_and_resume_pointer_missing(self):
         # taught earlier, active later, but no next_action and no Log row -> pointer missing
         old = _iso(date(2026, 6, 12))

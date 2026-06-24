@@ -21,7 +21,7 @@ any Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others).
 language; it teaches one concept at a time, captures what you understood (and where you stumbled),
 and quietly schedules spaced reviews so it actually sticks.
 
-`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 74 passing`
+`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 76 passing`
 
 > You're usually learning several things at once — a professional domain, an exam, a coding skill —
 > and each needs a *different* kind of teaching, so you lose the thread every time you switch.
@@ -161,9 +161,10 @@ learn-everything is built so your learning leaves a durable, inspectable trace �
   long-term memory) / 7-day accuracy.
 - **Source provenance** — each card can carry a `source` (the note / url / page it was distilled
   from), so any fact traces back to where it came from.
-- **A non-skippable close** — `session-check --strict` won't let a session end without a card-or-
-  reason, a log row, a `next_action`, and a CONTEXT.md updated today, so memory actually persists
-  (and the digest stays bounded — no context overload as a track runs for months).
+- **A close-the-loop check** — `session-check --strict` verifies a session left a card-or-reason, a
+  log row, a `next_action`, and a CONTEXT.md updated today; the tutor runs it and won't declare done
+  until it passes, so memory actually persists (and the digest stays bounded — no context overload
+  as a track runs for months).
 
 Captured misconceptions **feed forward**: the next session re-checks your sticking points first and
 corrects the route — skim what you own, dwell on what you missed, re-teach a past slip from a fresh
@@ -257,7 +258,7 @@ skills/learn/SKILL.md     the single host-adapter skill (+ FEEDBACK.md improveme
 methods/*.md              the pedagogy toolkit (data, not code): 7 standalone + 3 layers + modes
 scripts/registry.py       all track/card/registry/planner state I/O (stdlib)
 scripts/fsrs.py           FSRS-6 scheduler (stdlib)
-tests/                    unit tests (74, CI) — engine + long-doc splitter/curriculum
+tests/                    unit tests (76, CI) — engine + long-doc splitter/curriculum
 plans/                    design specs, feature designs, architecture/optimization plans
 docs/                     audits + the architecture optimization plan
 tracks/                   YOUR learning data (gitignored)
@@ -293,7 +294,7 @@ core stays pip-free and CI stays green:
 ## Status & honesty
 
 This is **alpha**. What's solid and tested: the deterministic engine, the full state machine, every
-CLI, and all file artifacts — end-to-end across every flow (74 unit tests + a from-zero acceptance
+CLI, and all file artifacts — end-to-end across every flow (76 unit tests + a from-zero acceptance
 run, all green). What only a real session can prove: the **quality of the teaching dialogue itself**
 (that depends on the host model). It hasn't yet been battle-tested across months and many subjects —
 that's the next milestone, not a build task.

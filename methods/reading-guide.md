@@ -139,8 +139,8 @@ After approval, study is NOT one marathon. Each session:
 
 1. **Resume** — pick the next chunk = the first still-`pending` chunk in document (recommended)
    order. The picker is `python3 scripts/structure.py next-chunk --track <id>`; it returns that
-   chunk's id, heading path, page range, and its source text to teach. "Resume" jumps straight to
-   the recorded position — never re-derive the map, never re-OCR.
+   chunk's id, heading path, page range, and its source text to teach. "Resume" returns straight to
+   where you left off (the first still-pending chunk) — never re-derive the map, never re-OCR.
 2. **Teach that one chunk** with the track's pedagogy (`methods/tutor.md` read-along +
    silent `methods/learner-model.md`), grounded ONLY in that chunk's source note plus its
    chapter summary as context. Not the whole book.

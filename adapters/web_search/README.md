@@ -48,8 +48,9 @@ python3 adapters/web_search/search.py --query "..." [--max 5] [--md]
 3. else a friendly `WebSearchError` telling you to set the env var or
    `pip install ddgs`.
 
-Field aliases are normalized (`href`/`link` → `url`, `body`/`description` →
-`snippet`), so most backends' raw rows work as-is.
+Field aliases are normalized — `href`/`link` → `url`, `body`/`description` →
+`snippet`, `name`/`headline` → `title` — so most backends' raw rows work as-is
+(anything outside these keys is dropped; emit `{title,url,snippet}` to be safe).
 
 ## Safety — results are untrusted
 

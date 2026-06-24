@@ -888,9 +888,12 @@ def nudge(today: str | None = None, root: Path | None = None) -> str:
     due = board["due_total"]
     n_tracks = board["tracks_with_due"]
     leech_total = sum(t.get("leeches", 0) for t in board["tracks"])
+    # Match status_board's sort: a deadline within URGENT_DAYS *or already past*
+    # is urgent. (A stray `0 <=` lower bound used to hide overdue items from the
+    # very daily-note/cron surface meant to re-engage the learner.)
     urgent = sum(
         1 for t in board["tracks"]
-        if t["days_to_deadline"] is not None and 0 <= t["days_to_deadline"] < URGENT_DAYS
+        if t["days_to_deadline"] is not None and t["days_to_deadline"] < URGENT_DAYS
     )
     if due == 0 and urgent == 0:
         return "learn-everything: nothing due today — a good day to learn something new."
@@ -900,7 +903,8 @@ def nudge(today: str | None = None, root: Path | None = None) -> str:
         t = "subject" if n_tracks == 1 else "subjects"
         parts.append(f"{due} {s} due across {n_tracks} {t}")
     if urgent:
-        parts.append(f"{urgent} with a deadline in <{URGENT_DAYS}d")
+        d_s = "deadline" if urgent == 1 else "deadlines"
+        parts.append(f"{urgent} with a {d_s} due soon/overdue")
     if leech_total:
         parts.append(f"{leech_total} to re-teach")
     return "learn-everything: " + "; ".join(parts) + " — open it and ask “what should I do?”"

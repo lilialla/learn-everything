@@ -32,10 +32,21 @@ from pathlib import Path
 UNTRUSTED_OPEN = "<<<UNTRUSTED_INPUT>>>"
 UNTRUSTED_CLOSE = "<<<END_UNTRUSTED>>>"
 
-# Tiny built-in fallback if url_ingest's richer scanner isn't importable.
+# Built-in fallback if url_ingest's scanner isn't importable. Kept in sync with
+# adapters/url_ingest/ingest.py:_INJECTION_PHRASES so the two paths flag the same.
 _INJECTION_PHRASES = (
-    "ignore previous", "ignore the above", "new system prompt", "from now on",
-    "disregard", "忽略前面", "忽略以上", "按我说的做",
+    "ignore previous instructions",
+    "ignore all previous",
+    "disregard previous",
+    "new system prompt",
+    "new instructions",
+    "from now on",
+    "you are now",
+    "system:",
+    "忽略前面",
+    "忽略以上",
+    "忽略之前",
+    "按我说的做",
 )
 
 
@@ -149,7 +160,7 @@ def search(query: str, *, max_results: int = 5) -> dict:
     for r in rows[:max_results]:
         if not isinstance(r, dict):
             continue
-        title = str(r.get("title") or "").strip()
+        title = str(r.get("title") or r.get("name") or r.get("headline") or "").strip()
         url = str(r.get("url") or r.get("href") or r.get("link") or "").strip()
         snippet = str(r.get("snippet") or r.get("body") or r.get("description") or "").strip()
         scan = _scan_injection(f"{title}\n{snippet}")
