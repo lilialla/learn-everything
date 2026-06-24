@@ -51,13 +51,22 @@ impression. A confident wrong answer downgrades grasp to `over-confident`, not `
 good answer to a hard question upgrades it. If your prediction of what they'd say keeps being
 wrong, your model is off — widen your questions to recalibrate rather than pushing forward.
 
-## Persistence (optional, lightweight)
+## Persistence (the silent read must leave a trace — not optional)
 
-If a `profile.md` exists at the repo root, read it for durable traits (background, prior
-knowledge, language, pace preference) and use them as priors. Long-running misconceptions or
-recurring weak spots worth remembering across sessions can be noted in the track's
-`notes/` (e.g. a short "known sticking points" note) — but keep this light; the live
-per-turn inference above is the main mechanism.
+The per-turn inference is silent, but a CONFIRMED misconception or sticking point must be
+**persisted**, or it's lost the moment the conversation ends:
+
+- **Always** record a confirmed sticking point in the track's `tracks/<id>/CONTEXT.md` under
+  "Known sticking points" (the rolling memory RESUME reads first).
+- When a misconception is genuinely **corrected** during the session, also write a dated
+  `tracks/<id>/learning-records/NNNN-slug.md` (1–3 sentences: what was wrong, what's right now,
+  why it matters next time) — these are the durable, traceable insights behind the rolling digest.
+- A recurring sticking point is prime **review-card** material — flag it for the card pass.
+- If a `profile.md` exists at the repo root, read it for durable traits (background, prior
+  knowledge, language, pace) and use them as priors.
+
+The live per-turn inference drives teaching; persistence is what makes "where I went wrong"
+survive into the next session. Skipping it is the silent-gap failure.
 
 ## Anti-patterns
 

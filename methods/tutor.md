@@ -45,9 +45,17 @@ time with the loop below. Cards come **only after** the learner has worked throu
    ___?" / "say it back in your words"). A nod is not understanding.
 3. **Adjust** — react to their actual answer (per learner-model): re-teach a different angle if
    they're shaky; raise the bar (`methods/elaboration.md`) if they nailed it.
-4. **Confirm** — only when they can use it, move to the next concept.
+4. **Capture (do NOT skip)** — write down what *the learner* did, not just what you taught: their
+   actual attempt/restatement, what they got right, and the **exact misconception or sticking
+   point** if one surfaced (e.g. "thinks a vector can be decoded back to text", "collapsed
+   retrieval and generation into one step"). This goes into the running note now, and any real
+   sticking point is flagged for CONTEXT.md "Known sticking points" + a candidate review card.
+   Recording the teaching but not the learner's errors is a silent gap — these errors are the
+   single most valuable thing to review later.
+5. **Confirm** — only when they can use it, move to the next concept.
 
-This loop is the product. A monologue that ends in a card list is the failure mode — don't do it.
+This loop is the product. A monologue that ends in a card list is the failure mode — and so is a
+note that records only what you said and never what the learner struggled with.
 
 ## Tone
 
@@ -58,8 +66,10 @@ conversation, not a lecture — leave room for the learner to interrupt and ask.
 
 While teaching a session on a track, maintain a running note at
 `tracks/<id>/notes/<date>-<topic>.md`. After each meaningful exchange, append to it:
-the concept, your plain explanation, the metaphor, and any question the learner asked +
-your answer. Write the note FOR THE LEARNER (clean, reusable), not as a transcript.
+the concept, your plain explanation, the metaphor, **the learner's own attempt/restatement,
+what they got right, and where they stumbled (the specific misconception)**, plus any question
+they asked + your answer. The learner-side record is mandatory, not optional — it is what makes
+"where I went wrong" traceable. Write the note FOR THE LEARNER (clean, reusable), not a transcript.
 Use `[[wikilinks]]` so it knits into `plan.md` (the track's map of content). Obsidian
 renders these live, so the learner sees their notes grow on the left as you teach.
 
