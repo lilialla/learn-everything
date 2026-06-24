@@ -6,6 +6,13 @@ informal during alpha.
 
 ## [Unreleased]
 
+- **Docs repositioning.** Reframed the project as a host-agnostic **Skill** that installs into any
+  Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others) — Obsidian + Claudian
+  is now presented as one *recommended* setup, not a requirement. Removed comparative/"not a card
+  factory"/"not just the material" marketing copy (the product is original; there is no peer or prior
+  version to contrast against) in favor of positive statements of what it does. Internal SKILL
+  behavioral rules (teach-before-cards) are unchanged. Corrected stale engine test count (44 → 46)
+  across README/README.zh/CHANGELOG/CONTRIBUTING; synced the 中文 roadmap/credits with English.
 - Community health files (CONTRIBUTING, SECURITY, issue/PR templates), bilingual README, CI.
 - **Unfroze the deferred backlog as out-of-core adapters + modes** (alpha; stdlib core stays
   pip-free, CI green):
@@ -51,7 +58,7 @@ end-to-end; teaching-dialogue quality depends on the host model and isn't yet ba
   worked-examples, deliberate-practice, elaboration, dual-coding, metacognition, learner-model,
   learning-science — selected by material × learner × goal.
 - **Obsidian-native delivery** via the Claudian plugin; cards compatible with obsidian-spaced-repetition.
-- **Tests.** 44 unit tests for the engine + a from-zero end-to-end acceptance run.
+- **Tests.** 46 unit tests for the engine + a from-zero end-to-end acceptance run.
 
 ### Notes
 - Privacy-first: learner data (`tracks/`, `profile.md`, `registry.json`, `.obsidian/`, `.claudian/`)

@@ -52,8 +52,9 @@ without a trace.**
   Say which in one plain line at the start ("Let's read this one closely from the source — I'll
   annotate as you go" / "I'll write you a cleaner lesson to read on the left; the original's linked
   if you want to check it").
-  **It is always just TWO columns, not three:** the learner's *one current* doc in the Obsidian
-  editor (left) + the Claudian chat (right). The lesson and the source are two files switched with a
+  **It is always just TWO panes, not three:** the learner's *one current* doc beside the chat — in
+  Obsidian that's the editor (left) + the Claudian chat (right); in other Skill hosts it's whatever
+  read-alongside-chat layout the host offers. The lesson and the source are two files switched with a
   tab — never required side-by-side, so no big screen is needed. For expository material the lesson
   **replaces** the source as what they read (don't make them track both). This choice is the default
   you **announce, not ask**; if the learner prefers the other, switch immediately and **remember it
@@ -195,7 +196,8 @@ the full "why" to a later nudge (don't gate the first lesson on it).
 - Teach **one concept at a time** with the per-concept loop in `methods/<chosen>.md` and
   `methods/tutor.md` (Expose → Probe → Adjust → Confirm): explain with one vivid, accurate
   metaphor, have them *use or explain* it, adjust to their answer, confirm before moving on.
-  Save running notes to `tracks/<id>/notes/<date>-<slug>.md` so they appear live in Obsidian.
+  Save running notes to `tracks/<id>/notes/<date>-<slug>.md` so they appear live in the learner's
+  vault/editor (e.g. Obsidian).
   **Capture the learner, not just your teaching:** record their actual attempts, what they got
   right, and the **exact misconception/sticking point** whenever one surfaces — that learner-side
   record is mandatory and is what makes "where I went wrong" traceable later (see the per-concept
@@ -216,7 +218,7 @@ the full "why" to a later nudge (don't gate the first lesson on it).
 ### Choosing how to teach (internal — present only the outcome)
 Match material × learner × goal: explanatory/conceptual text → read-along teaching
 (`tutor`, the safe default for knowledge); something they must *do* (procedure / math / code) →
-worked examples then practice (`methods/worked-examples.md` / `deliberate-practice.md` if present,
+worked examples then practice (`methods/worked-examples.md` / `methods/deliberate-practice.md` if present,
 else fall back to tutor + active-recall); learner already solid/bored → push with transfer/edge
 cases (`elaboration`); a concept that keeps failing in review → re-teach via questioning
 (`socratic`/`feynman`). Default to read-along only for knowledge — don't use it for everything.

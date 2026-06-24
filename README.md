@@ -12,39 +12,40 @@
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="status: alpha">
   <img src="https://img.shields.io/badge/engine-Python%20stdlib%20%C2%B7%20zero%20deps-3776AB?logo=python&logoColor=white" alt="engine: Python stdlib, zero deps">
   <img src="https://img.shields.io/badge/spaced%20repetition-FSRS--6-success" alt="spaced repetition: FSRS-6">
-  <img src="https://img.shields.io/badge/runs%20in-Obsidian-7C3AED?logo=obsidian&logoColor=white" alt="runs in: Obsidian">
+  <img src="https://img.shields.io/badge/runs%20in-any%20Skill--capable%20AI-7C3AED" alt="runs in: any Skill-capable AI">
   <a href="#contributing"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome"></a>
 </p>
 
-**An AI tutor that teaches you many subjects at once — and remembers.** Talk to it in plain
-language inside Obsidian; it teaches one concept at a time, captures what you understood (and
-where you stumbled), and quietly schedules spaced reviews so it actually sticks.
+**An AI tutor that teaches you many subjects at once — and remembers.** It installs as a skill into
+any Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others). Talk to it in plain
+language; it teaches one concept at a time, captures what you understood (and where you stumbled),
+and quietly schedules spaced reviews so it actually sticks.
 
-`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 44 passing`
+`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 46 passing`
 
-> Most learning tools handle one topic with one method. learn-everything is built for the real
-> situation: you're learning five different things at once — a professional domain, an exam, a
-> coding skill — each needs a *different* kind of teaching, and you lose the thread every time you
-> switch. This keeps the thread.
+> You're usually learning several things at once — a professional domain, an exam, a coding skill —
+> and each needs a *different* kind of teaching, so you lose the thread every time you switch.
+> learn-everything is built to hold that thread for you across all of them.
 
 ---
 
-## Why it's different
+## What it does
 
-- **Teach-first, not a card factory.** It teaches you in dialogue (explain → you try → adjust →
-  confirm), and only *after* you understand does it distill a few review cards. Reading material
-  and dumping a flashcard list is the explicit anti-pattern it refuses.
+- **Teach-first, dialogic learning.** It teaches you in dialogue (explain → you try → adjust →
+  confirm), and only *after* you understand does it distill a few review cards. Understanding always
+  comes before review material.
 - **Cross-track orchestration.** Every subject is a "track" under one board. Ask *"what should I do
   today?"* and it answers across all of them at once — what's due to review, what's stale, what's
   near a deadline — and time-boxes a plan.
-- **It remembers you, not just the material.** Every session leaves a memory digest, your
+- **It remembers you as a learner.** Every session leaves a memory digest, your
   misconceptions, the terms you asked about, and a resume pointer — so days later it reconstructs
   *"here's what you learned, where you got stuck, what's next."*
 - **A real pedagogy toolkit.** 11 evidence-based teaching methods (read-along, Socratic, Feynman,
   worked examples, deliberate practice, spaced/active recall, elaboration, dual-coding,
   metacognition, …), chosen automatically to fit the material and the learner.
-- **Obsidian-native, one app.** Runs inside Obsidian via the Claudian plugin: read on the left,
-  talk to the tutor on the right, notes grow live in your vault. Plain markdown you own.
+- **Cross-host skill design.** It runs as a skill in any Skill-capable AI assistant. One recommended
+  setup is Obsidian + the Claudian plugin (read on the left, talk to the tutor on the right, notes
+  grow live in your vault); Claude Code works too. Everything is plain markdown you own.
 - **Private by default & zero-dependency.** Your learning data never leaves your machine and is
   gitignored; the engine is pure Python standard library — no `pip install`.
 
@@ -59,10 +60,12 @@ where you stumbled), and quietly schedules spaced reviews so it actually sticks.
 - A question heatmap — see which concepts you asked about most (your weak/important spots).
 - Progress you can see: cards learned, cards locked into long-term memory, weekly accuracy.
 
-## Quick start (just talk to it in Obsidian)
+## Quick start (just talk to it)
 
-The intended way to use learn-everything is **inside Obsidian, in plain language** — you never
-touch a command line.
+learn-everything is a skill you install into any Skill-capable AI assistant, then talk to in plain
+language — you never touch a command line. The setup below uses **Obsidian + the Claudian plugin**,
+one recommended path; if you already use Claude Code, point it at this folder and skip to talking to
+the tutor.
 
 **Day 1 — one-time setup (~10 min):**
 
@@ -243,7 +246,7 @@ skills/learn/SKILL.md     the single host-adapter skill (+ FEEDBACK.md improveme
 methods/*.md              the 11-method pedagogy toolkit (data, not code)
 scripts/registry.py       all track/card/registry/planner state I/O (stdlib)
 scripts/fsrs.py           FSRS-6 scheduler (stdlib)
-tests/                    unit tests (44) for the engine
+tests/                    unit tests (46) for the engine
 plans/                    design specs, feature designs, architecture/optimization plans
 docs/                     audits + the architecture optimization plan
 tracks/                   YOUR learning data (gitignored)
@@ -275,7 +278,7 @@ core stays pip-free and CI stays green:
 ## Status & honesty
 
 This is **alpha**. What's solid and tested: the deterministic engine, the full state machine, every
-CLI, and all file artifacts — end-to-end across every flow (44 unit tests + a from-zero acceptance
+CLI, and all file artifacts — end-to-end across every flow (46 unit tests + a from-zero acceptance
 run, all green). What only a real session can prove: the **quality of the teaching dialogue itself**
 (that depends on the host model). It hasn't yet been battle-tested across months and many subjects —
 that's the next milestone, not a build task.
