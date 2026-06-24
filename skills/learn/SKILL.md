@@ -58,6 +58,15 @@ without a trace.**
   **replaces** the source as what they read (don't make them track both). This choice is the default
   you **announce, not ask**; if the learner prefers the other, switch immediately and **remember it
   for this track** (note the preference so future sessions honor it).
+- **Every question is a signal — capture and consolidate it, don't let it evaporate.** Whenever the
+  learner asks something ad-hoc — a term they don't know, a sentence they pulled out to probe, an
+  increasingly specific follow-up — even in pure reading/margin mode, record it: the **term** → the
+  track's `glossary.md` (plain definition), the **Q+A** → a "Questions & terms" section in the
+  session note. At a pause or session close, **consolidate**: cluster the questions by concept; if
+  the learner drilled deep on one area, name it as a focus/sticking point in `CONTEXT.md` *with how
+  many times it came up*, turn the resolved ones into review cards, and write a `learning-records/`
+  entry if a question exposed a real gap. The drill-down pattern itself is data — "you spent five
+  questions on vector retrieval" tells both of you where the weak (or most important) spot is.
 - **Sensible defaults, minimal questions.** Never ask the user to choose technical things
   (ids, modes, method names). Pick good defaults silently; ask only what genuinely shapes their
   learning (their goal, their current understanding).

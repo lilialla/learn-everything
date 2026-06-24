@@ -78,6 +78,12 @@ it correctly** — it's a record of learned compression, not a dictionary to rea
 one term, list aliases to avoid), keep definitions to 1–2 sentences (what it IS), and reuse glossary
 terms inside other definitions. Once defined, use that term everywhere (cards, notes, explanations).
 
+**Capture on ask, promote on understanding.** When the learner asks "what does X mean?", answer it
+and record the term immediately (a provisional definition is fine) so the question is never lost;
+mark it solid once they can use it. A term asked about more than once is a sticking point — surface
+it in `CONTEXT.md` and make a card. The glossary is thus also the running tally of what the learner
+had to look up — itself a map of where the material was hard for them.
+
 ## 7. Resources (trusted, cited, curated)
 
 Keep trusted sources in `tracks/<id>/plan.md` (or a `resources` section): annotate each (what it
