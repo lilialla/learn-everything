@@ -1,5 +1,9 @@
 # learn-everything
 
+<p align="center">
+  <img src="assets/learn-everything-logo-anime-girl.png" alt="learn-everything logo" width="220">
+</p>
+
 **An AI tutor that teaches you many subjects at once — and remembers.** Talk to it in plain
 language inside Obsidian; it teaches one concept at a time, captures what you understood (and
 where you stumbled), and quietly schedules spaced reviews so it actually sticks.
