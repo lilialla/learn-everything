@@ -202,19 +202,36 @@ class TestDelegation(unittest.TestCase):
             self.assertEqual(title, "Real Title")
             self.assertIn("video-notes", fetcher)
 
-    def test_video_no_provider_raises_friendly(self):
+    def test_provider_resolves_to_vendored_when_no_env(self):
+        """A fresh clone must find the vendored provider with no env/install."""
         import os
-        old = os.environ.get("LEARN_VIDEO_NOTES")
-        os.environ["LEARN_VIDEO_NOTES"] = "/nonexistent/fetch_subtitles.py"
+        old_v = os.environ.pop("LEARN_VIDEO_NOTES", None)
+        old_w = os.environ.pop("LEARN_WECHAT_FETCH", None)
         try:
-            with self.assertRaises(IngestError) as ctx:
-                mod._fetch_video("https://youtu.be/x", allow_login=False)
-            self.assertEqual(ctx.exception.source_type, "video")
+            vid = mod._find_provider(
+                "LEARN_VIDEO_NOTES",
+                "providers/video-notes/scripts/fetch_subtitles.py",
+                ".claude/plugins/*/skills/video-notes/scripts/fetch_subtitles.py",
+            )
+            self.assertIsNotNone(vid, "vendored video-notes provider not found")
+            self.assertTrue(str(vid).replace("\\", "/").endswith(
+                "providers/video-notes/scripts/fetch_subtitles.py"))
+            self.assertTrue(vid.exists())
+
+            wx = mod._find_provider(
+                "LEARN_WECHAT_FETCH",
+                "providers/wechat-article-fetch/scripts/fetch.js",
+                ".claude/plugins/*/skills/wechat-article-fetch/scripts/fetch.js",
+            )
+            self.assertIsNotNone(wx, "vendored wechat-article-fetch provider not found")
+            self.assertTrue(str(wx).replace("\\", "/").endswith(
+                "providers/wechat-article-fetch/scripts/fetch.js"))
+            self.assertTrue(wx.exists())
         finally:
-            if old is None:
-                os.environ.pop("LEARN_VIDEO_NOTES", None)
-            else:
-                os.environ["LEARN_VIDEO_NOTES"] = old
+            if old_v is not None:
+                os.environ["LEARN_VIDEO_NOTES"] = old_v
+            if old_w is not None:
+                os.environ["LEARN_WECHAT_FETCH"] = old_w
 
 
 if __name__ == "__main__":

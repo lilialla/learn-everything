@@ -273,18 +273,28 @@ def _empty(text: str) -> bool:
     return len((text or "").strip()) < 40
 
 
-def _find_provider(env_var: str, *glob_rels: str) -> Path | None:
-    """Resolve an existing local fetcher skill (reuse-not-rebuild). Prefers the
-    explicit env var (portable for any clone); else auto-probes the user's
-    ~/.claude install with globs (so we never hard-code a private plugin name).
-    Returns None when no provider is present (the route then degrades to a
-    friendly message — the public repo ships no scraper of its own here).
+def _find_provider(env_var: str, vendored_rel: str, *glob_rels: str) -> Path | None:
+    """Resolve a fetcher provider, in priority order:
+
+    1. explicit env var (portable override for any clone / CI / custom path);
+    2. the copy VENDORED in this repo under ``providers/`` — so a fresh clone
+       works out of the box, no install and no env var needed;
+    3. auto-probe the user's ``~/.claude`` install (an already-present skill is
+       reused; we never hard-code a private plugin name).
+
+    Returns None only if every path is absent.
     """
     import os
 
     explicit = os.environ.get(env_var)
     if explicit and Path(explicit).exists():
         return Path(explicit)
+    # Vendored-in-repo copy (self-contained clone). Anchored to the CODE repo,
+    # not the caller's data root, so it's found regardless of where tracks/ live.
+    code_root = Path(__file__).resolve().parent.parent.parent
+    vendored = code_root / vendored_rel
+    if vendored.exists():
+        return vendored
     home = Path.home()
     for rel in glob_rels:
         for hit in sorted(home.glob(rel)):
@@ -375,29 +385,31 @@ def _fetch_web(url: str, *, allow_login: bool) -> tuple[str, str, str]:
 
 
 def _fetch_wechat(url: str, *, allow_login: bool) -> tuple[str, str, str]:
-    """微信公众号 (mp.weixin) — DELEGATES to the wechat-article-fetch skill
-    (Node + Playwright, MIT). Resolve it via $LEARN_WECHAT_FETCH or by probing
-    ~/.claude for a wechat-article-fetch/scripts/fetch.js. Reuse-not-rebuild:
-    we run that proven scraper, never re-implement it here.
+    """微信公众号 (mp.weixin) — runs the VENDORED wechat-article-fetch provider
+    (Node + Playwright, MIT, under providers/wechat-article-fetch/). An env var
+    ($LEARN_WECHAT_FETCH) or an existing ~/.claude skill overrides it. We run
+    that proven scraper, never re-implement it here.
     """
     import shutil
     import tempfile
 
     prov = _find_provider(
         "LEARN_WECHAT_FETCH",
+        "providers/wechat-article-fetch/scripts/fetch.js",
         ".claude/plugins/*/skills/wechat-article-fetch/scripts/fetch.js",
         ".claude/skills/wechat-article-fetch/scripts/fetch.js",
     )
     if not prov:
         raise IngestError(
-            "wechat ingest reuses the wechat-article-fetch skill. Point "
-            "$LEARN_WECHAT_FETCH at its scripts/fetch.js (or install that skill), "
-            "or run it manually and paste the markdown.",
+            "wechat ingest needs the wechat-article-fetch provider. It ships "
+            "vendored under providers/wechat-article-fetch/ — point "
+            "$LEARN_WECHAT_FETCH at its scripts/fetch.js, or paste the markdown.",
             "wechat", url,
         )
     if not shutil.which("node"):
         raise IngestError(
-            "the wechat fetcher needs Node.js (node not found on PATH).",
+            "the wechat fetcher needs Node.js (node not found on PATH). "
+            "Install Node, then `npm install` in providers/wechat-article-fetch/.",
             "wechat", url,
         )
     with tempfile.TemporaryDirectory() as d:
@@ -416,23 +428,24 @@ def _fetch_wechat(url: str, *, allow_login: bool) -> tuple[str, str, str]:
 
 
 def _fetch_video(url: str, *, allow_login: bool) -> tuple[str, str, str]:
-    """Video (B站/YouTube/抖音) — DELEGATES to the video-notes skill (yt-dlp
-    subtitles, FunASR audio fallback). Resolve via $LEARN_VIDEO_NOTES or by
-    probing ~/.claude for video-notes/scripts/fetch_subtitles.py. We run that
+    """Video (B站/YouTube/抖音) — runs the VENDORED video-notes provider (yt-dlp
+    subtitles, FunASR audio fallback, under providers/video-notes/). An env var
+    ($LEARN_VIDEO_NOTES) or an existing ~/.claude skill overrides it. We run that
     proven pipeline and read back its transcript; we never re-implement it.
     """
     import tempfile
 
     prov = _find_provider(
         "LEARN_VIDEO_NOTES",
+        "providers/video-notes/scripts/fetch_subtitles.py",
         ".claude/plugins/*/skills/video-notes/scripts/fetch_subtitles.py",
         ".claude/skills/video-notes/scripts/fetch_subtitles.py",
     )
     if not prov:
         raise IngestError(
-            "video ingest reuses the video-notes skill. Point $LEARN_VIDEO_NOTES "
-            "at its scripts/fetch_subtitles.py (or install that skill), or run it "
-            "manually and paste the transcript.",
+            "video ingest needs the video-notes provider. It ships vendored "
+            "under providers/video-notes/ — point $LEARN_VIDEO_NOTES at its "
+            "scripts/fetch_subtitles.py, or paste the transcript.",
             "video", url,
         )
     with tempfile.TemporaryDirectory() as d:

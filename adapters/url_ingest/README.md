@@ -61,24 +61,27 @@ are imported at package import time; each loads only when its route runs.
 
 `prefer_local=True` forces no-upload PDF routes for confidential tracks.
 
-## Providers — reuse existing skills, don't re-scrape (video / wechat)
+## Providers — vendored, clone-and-go (video / wechat)
 
-The `video` and `wechat` routes **delegate to proven local skills** rather than
-re-implementing scraping (reuse-not-rebuild; those skills handle login state,
-anti-bot, `--browser edge`, image filtering, etc.). The adapter finds them by:
+The `video` and `wechat` routes run **proven fetchers bundled in this repo** under
+[`providers/`](../../providers/README.md) rather than re-implementing scraping
+(reuse-not-rebuild; they handle login state, anti-bot, `--browser edge`, image
+filtering, etc.). So a fresh clone works out of the box. The adapter resolves a
+provider, in order:
 
-1. an explicit env var — **`LEARN_VIDEO_NOTES`** → a `video-notes`
+1. an env var override — **`LEARN_VIDEO_NOTES`** → a `video-notes`
    `fetch_subtitles.py`; **`LEARN_WECHAT_FETCH`** → a `wechat-article-fetch`
-   `fetch.js` (set these for any clone / CI / a custom location);
-2. else auto-probe `~/.claude` (`.claude/plugins/*/skills/<name>/…` and
-   `.claude/skills/<name>/…`) — so an existing install is found automatically.
+   `fetch.js` (for a custom location / CI);
+2. the **vendored copy** in `providers/` (the default);
+3. else auto-probe `~/.claude` — so an installed skill is reused.
 
-If no provider is found, the route raises a friendly `IngestError` telling the
-user to set the env var, install the skill, or run it manually and paste the
-result. (These skills are **not vendored** into this repo: `video-notes` is
-"personal-use" and unlicensed for redistribution; `wechat-article-fetch` is MIT
-but Node+Playwright — delegation keeps a single source of truth and this repo's
-Python/zero-dep core clean.)
+Vendoring the *code* doesn't bundle the heavy *runtime deps*: video needs
+`pip install yt-dlp`; wechat needs Node.js + `npm install` (Playwright) inside
+`providers/wechat-article-fetch/`. Until those are present the route raises a
+friendly `IngestError` naming exactly what to install. Licensing/attribution is
+preserved — `wechat-article-fetch` ships its MIT `LICENSE.txt` verbatim;
+`video-notes` keeps its "personal-study use" note. See
+[`providers/README.md`](../../providers/README.md).
 
 ## How it's invoked
 

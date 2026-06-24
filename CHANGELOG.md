@@ -17,10 +17,14 @@ informal during alpha.
   - Personalized FSRS weights (`adapters/fsrs_optimize/`) + a `load_weights` hook in
     `scripts/fsrs.py` (per-track `fsrs-weights.json` auto-loaded when present).
   - Dep-bearing routes import-gracefully and aren't yet exercised against live inputs (alpha).
-- **url_ingest video/wechat now delegate to the proven local skills** (reuse-not-rebuild) instead
-  of stub hand-offs: resolves `video-notes` / `wechat-article-fetch` via `$LEARN_VIDEO_NOTES` /
-  `$LEARN_WECHAT_FETCH` or auto-probing `~/.claude`, shells out, and reads back the markdown. Those
-  skills are not vendored (license/stack); the route degrades to a friendly message if absent.
+- **url_ingest video/wechat now run vendored fetchers (clone-and-go).** The proven `video-notes`
+  (B站/YouTube/抖音 subtitles) and `wechat-article-fetch` (公众号, Node+Playwright) skills are
+  **bundled in-repo under `providers/`** so a fresh clone works with no extra download. Resolution
+  order: `$LEARN_VIDEO_NOTES`/`$LEARN_WECHAT_FETCH` → vendored copy → `~/.claude`. Source only is
+  vendored (no `node_modules`); runtime deps (`yt-dlp`; Node + `npm install` Playwright) install on
+  demand and the route raises a friendly hint if they're missing. `wechat-article-fetch`'s MIT
+  `LICENSE.txt` is retained verbatim; `video-notes` keeps its personal-study-use note. See
+  `providers/README.md`.
 
 ## [0.1.0-alpha] — 2026-06-24
 

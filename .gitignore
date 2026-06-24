@@ -39,3 +39,10 @@ __pycache__/
 # Personalized FSRS weights (fit from a learner's review history — personal data).
 # Per-track weights under tracks/ are already covered above; this is the global fit.
 /fsrs-weights.json
+
+# Vendored providers ship as SOURCE only. Their installed deps are huge
+# (Playwright ~hundreds of MB) and machine-specific — `npm install` regenerates.
+providers/*/node_modules/
+# Stray fetch outputs accidentally produced inside a provider dir.
+providers/*/*-out.md
+providers/*/out.md

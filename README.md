@@ -257,7 +257,9 @@ core stays pip-free and CI stays green:
 - **`exam` & `applied` track modes** — `methods/exam.md` (syllabus → study → quiz → mock toward a
   dated target) and `methods/applied.md` (learn-by-building; capture the traps).
 - **URL ingestion** (`adapters/url_ingest/`) — send a link → cleaned source markdown → the normal
-  teach loop. Web route works end-to-end; wechat/video/PDF hand off to existing scrapers.
+  teach loop. Web route works end-to-end; video (B站/YouTube/抖音) and 微信公众号 run **vendored
+  fetchers** bundled under [`providers/`](providers/README.md) so a clone works out of the box
+  (runtime deps install on demand); PDF hands off to the doc adapter.
 - **Long-document ingestion** — `scripts/structure.py` (stdlib splitter) + `methods/reading-guide.md`
   (导读: a top-down syllabus, taught chunk-by-chunk) + `adapters/doc_ingest/` (OCR/extraction).
 - **MCP server** (`mcp/server.py`) — drive the same engine from any MCP-capable host.
@@ -293,6 +295,9 @@ before sending a change.
 - FSRS scheduling follows [open-spaced-repetition/py-fsrs](https://github.com/open-spaced-repetition/py-fsrs)
   (FSRS-6); cards are compatible with [obsidian-spaced-repetition](https://github.com/st3v3nmw/obsidian-spaced-repetition);
   the in-Obsidian experience runs on [Claudian](https://github.com/YishenTu/claudian).
+- Vendored fetchers under [`providers/`](providers/README.md): `wechat-article-fetch`
+  (MIT, © 2025 杨卫薪律师 — `LICENSE.txt` retained verbatim) and `video-notes` (personal-study-use
+  note retained). Used unmodified to turn a link into a learnable source.
 
 ## License
 
