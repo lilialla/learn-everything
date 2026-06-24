@@ -7,6 +7,16 @@ informal during alpha.
 ## [Unreleased]
 
 - Community health files (CONTRIBUTING, SECURITY, issue/PR templates), bilingual README, CI.
+- **Unfroze the deferred backlog as out-of-core adapters + modes** (alpha; stdlib core stays
+  pip-free, CI green):
+  - `exam` and `applied` track modes (`methods/exam.md`, `methods/applied.md`).
+  - URL ingestion adapter (`adapters/url_ingest/`): link → cleaned source markdown.
+  - Long-document ingestion: `scripts/structure.py` (stdlib splitter), `methods/reading-guide.md`
+    (导读 syllabus), `adapters/doc_ingest/` (OCR/extraction).
+  - MCP server (`mcp/server.py`) wrapping the core for other hosts.
+  - Personalized FSRS weights (`adapters/fsrs_optimize/`) + a `load_weights` hook in
+    `scripts/fsrs.py` (per-track `fsrs-weights.json` auto-loaded when present).
+  - Dep-bearing routes import-gracefully and aren't yet exercised against live inputs (alpha).
 
 ## [0.1.0-alpha] — 2026-06-24
 

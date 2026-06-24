@@ -1,12 +1,23 @@
 # learn-everything — Feature Designs
 
-> 🧊 **FROZEN (2026-06-24) — do not build these yet.** Per the architecture optimization plan
-> ([`docs/2026-06-24-architecture-optimization-plan.md`](../../docs/2026-06-24-architecture-optimization-plan.md)),
-> the entire deferred backlog below (exam mode, applied mode, URL ingestion, long-document
-> ingestion, personalized FSRS weights) is **blocked until the core retention loop is demonstrably
-> sticky for one user on one track: ≥10 cards and ≥3 review days.** Building breadth against an
-> empty deck is the main maturity risk. Stock FSRS-6 defaults stay; revisit personalized weights
-> only after >200 graded reviews.
+> 🟢 **UNFROZEN & BUILT (2026-06-24, alpha).** This backlog has now been implemented at the user's
+> request — as **out-of-core adapters + new track modes**, so the stdlib core stays pip-free and CI
+> stays green:
+> - `exam` mode → `methods/exam.md`; `applied` mode → `methods/applied.md` (reuse the engine; exam
+>   date = the track `deadline`).
+> - URL ingestion → `adapters/url_ingest/` (lazy deps; web route end-to-end, wechat/video/pdf hand
+>   off to existing skills).
+> - Long-document ingestion → `scripts/structure.py` (stdlib splitter) + `methods/reading-guide.md`
+>   (导读) + `adapters/doc_ingest/` (OCR/extraction, lazy deps).
+> - MCP server → `mcp/server.py` (wraps the core; lazy MCP SDK).
+> - Personalized FSRS weights → `adapters/fsrs_optimize/` + a `load_weights` hook in `scripts/fsrs.py`
+>   (per-track `fsrs-weights.json` auto-loaded if present; **only meaningful after ~200 reviews**).
+>
+> **Honesty caveats (alpha):** dep-bearing routes (real web fetch, OCR, the MCP handshake, the torch
+> optimizer) are wired and import-graceful but **not yet exercised against live inputs / installed
+> deps**; validate on real material before relying on them. The original freeze rationale still holds
+> as guidance — don't let breadth outrun a sticky core loop. The detailed designs below remain the
+> reference for finishing/​hardening each.
 
 > These are the **detailed feature designs** for the roadmap items and Open Items of the main
 > spec, [`2026-06-22-learning-os-spec.md`](./2026-06-22-learning-os-spec.md). The MVP (spine +

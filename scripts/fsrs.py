@@ -163,6 +163,26 @@ def schedule(state, grade, now, w=None, retention=REQUESTED_RETENTION):
     }
 
 
+def load_weights(path):
+    """Load a 21-float FSRS weight vector from a fsrs-weights.json, or None.
+
+    The optional adapters/fsrs_optimize adapter writes such a file from a learner's
+    real review history. This is the only hook the stdlib core exposes for it — the
+    core never depends on the adapter, and falls back to DEFAULT_WEIGHTS when absent.
+    Returns None on any problem (missing/corrupt/wrong-shape) so scheduling degrades
+    gracefully to the built-in weights.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return None
+    w = data.get("weights") if isinstance(data, dict) else data
+    if isinstance(w, list) and len(w) == 21 and all(isinstance(x, (int, float)) for x in w):
+        return [float(x) for x in w]
+    return None
+
+
 def _parse_state(raw):
     """Parse the --state argument; '-' or empty means a new card."""
     if raw is None or raw == "-" or raw.strip() == "":
@@ -178,6 +198,8 @@ def main(argv=None):
     sched.add_argument("--state", default="-", help="Prior card state JSON, or '-' for new")
     sched.add_argument("--grade", required=True, help="Rating: 1=Again 2=Hard 3=Good 4=Easy")
     sched.add_argument("--now", required=True, help="Review date YYYY-MM-DD")
+    sched.add_argument("--weights", default=None,
+                       help="Optional fsrs-weights.json (personalized); defaults to built-in weights")
 
     args = parser.parse_args(argv)
 
@@ -201,7 +223,8 @@ def main(argv=None):
             print("error: --state is not valid JSON: %s" % exc, file=sys.stderr)
             return 2
 
-        new_state = schedule(state, grade, now)
+        w = load_weights(args.weights) if args.weights else None
+        new_state = schedule(state, grade, now, w=w)
         print(json.dumps(new_state, ensure_ascii=False))
         return 0
 

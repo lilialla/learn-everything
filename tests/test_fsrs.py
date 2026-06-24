@@ -137,5 +137,30 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(out["reps"], 2)
 
 
+class TestLoadWeights(unittest.TestCase):
+    def test_missing_and_malformed_return_none(self):
+        self.assertIsNone(fsrs.load_weights("/no/such/file.json"))
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            bad = os.path.join(d, "w.json")
+            with open(bad, "w") as fh:
+                fh.write('{"weights": [1, 2, 3]}')  # wrong length
+            self.assertIsNone(fsrs.load_weights(bad))
+
+    def test_valid_weights_loaded_and_applied(self):
+        import tempfile
+        custom = [0.4] * 21  # valid 21-float vector, different from defaults
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "fsrs-weights.json")
+            with open(p, "w") as fh:
+                json.dump({"weights": custom}, fh)
+            loaded = fsrs.load_weights(p)
+            self.assertEqual(loaded, custom)
+        # custom weights change scheduling vs the built-in defaults
+        d0 = fsrs.schedule(None, 3, date(2026, 6, 22))
+        d1 = fsrs.schedule(None, 3, date(2026, 6, 22), w=custom)
+        self.assertNotEqual(d0["stability"], d1["stability"])
+
+
 if __name__ == "__main__":
     unittest.main()

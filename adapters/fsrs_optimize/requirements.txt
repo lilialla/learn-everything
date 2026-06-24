@@ -1,0 +1,9 @@
+# OPT-IN, dependency-heavy. Install ONLY if you want to fit personalized FSRS
+# weights from your own review history. These deps are intentionally NOT part of
+# the pip-free CORE (scripts/fsrs.py, scripts/registry.py) — they live here and
+# are imported lazily by adapters/fsrs_optimize/optimize.py.
+#
+#   pip install -r adapters/fsrs_optimize/requirements.txt
+#
+# fsrs-optimizer pulls torch (a large download) and pandas transitively.
+FSRS-Optimizer>=5.0.0

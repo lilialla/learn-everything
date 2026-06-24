@@ -102,7 +102,8 @@ logQ     : python3 scripts/registry.py log-question --track <id> --concept "<C>"
 questions: python3 scripts/registry.py questions [--track <id|all>]      # where they asked most, ranked by concept
 ```
 Run commands from the repo root; **quote the cwd path** (spaces + non-ASCII). State lives in
-`tracks/<id>/`; `registry.json` is a rebuildable cache — never hand-edit state files.
+`tracks/<id>/`; `registry.json` is a rebuildable cache — never hand-edit state files. (Other hosts
+can drive these same operations via the optional MCP server at `mcp/server.py` — see its README.)
 
 ---
 
@@ -139,8 +140,15 @@ Run commands from the repo root; **quote the cwd path** (spaces + non-ASCII). St
 > actually understands. Three beats are non-negotiable; everything else flexes.
 
 **If the subject is new**, create the track silently with good defaults (derive a short id from
-the title, knowledge subject, read-along teaching) — **never ask for or show an id**. Capture a
-one-line goal. Defer the full "why" to a later nudge (don't gate the first lesson on it).
+the title, read-along teaching) — **never ask for or show an id**. Capture a one-line goal. Defer
+the full "why" to a later nudge (don't gate the first lesson on it).
+
+**Pick the track's mode from what they want (infer; don't quiz them):**
+- a **dated, scored target** (an exam/cert — "pass IELTS by October") → `--mode exam`; put the exam
+  date in the track's deadline and follow `methods/exam.md` (syllabus → study → quiz → mock → readiness).
+- **building something real** ("help me build a small RAG app") → `--mode applied`; milestones drive,
+  learning is captured from the traps — follow `methods/applied.md`.
+- otherwise (learn a topic/body of knowledge) → `--mode domain` (the default).
 
 **BEAT 1 — Ready + safe.**
 - Run `ingest-check --track <id>`. If it isn't ready, resolve it in plain words first (usually:
@@ -159,6 +167,18 @@ one-line goal. Defer the full "why" to a later nudge (don't gate the first lesso
   Then set the primary text per the **Two-panes rule**: verbatim material → this cleaned source is
   what they read; expository material → also write a distilled `…-lesson.md` as the primary read and
   link the source. State which in one line before you start teaching.
+- **If they gave a URL** (optional adapter): call `adapters/url_ingest` to fetch + clean it into that
+  `…-source.md`, then continue the normal ingest on that file:
+  `from adapters.url_ingest import ingest_url, IngestError` → `ingest_url(url, track_id)`. If the
+  adapter or a route's deps are absent, or it raises `IngestError` (bot-check / paywall / unsupported),
+  say so plainly and ask them to paste the text (or install the optional deps). The adapter writes
+  ONLY the source file — all card/note/plan writes stay in the human-approved loop below.
+- **If it's a whole book / large PDF** (a big work, not an article): use the long-document path —
+  `adapters/doc_ingest` (`extract`; route scanned PDFs through `mineru-ocr` / `case-files-to-md` per
+  its `needs_ocr` handoff) → `python3 scripts/structure.py split` → then the **导读 reading-guide**
+  (`methods/reading-guide.md`): a top-down map becomes the track's `plan.md` syllabus (HUMAN APPROVAL
+  before writing), and you teach it progressively, one chunk per session, with the position in
+  `next_action`. Don't try to teach a 300-page book in one go.
 
 **BEAT 2 — Diagnose, then teach in dialogue (the actual learning — never skip).**
 - First find out where they are: ask, one question at a time, what they already know, their goal,

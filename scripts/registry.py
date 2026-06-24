@@ -596,7 +596,7 @@ def read_card_question(track_id: str, card_id: str, root: Path | None = None) ->
 # subcommands never touch fsrs, so they work even if fsrs.py is absent.
 
 
-def _fsrs_cli_scheduler(state, grade: int, now: str) -> dict:
+def _fsrs_cli_scheduler(state, grade: int, now: str, weights_path: str | None = None) -> dict:
     """Run scripts/fsrs.py's `schedule` subcommand and return the new state."""
     import subprocess
 
@@ -604,21 +604,13 @@ def _fsrs_cli_scheduler(state, grade: int, now: str) -> dict:
     if not fsrs_path.exists():
         raise ImportError(f"fsrs scheduler not found at {fsrs_path}")
     state_arg = "-" if not state else json.dumps(state, ensure_ascii=False)
-    proc = subprocess.run(
-        [
-            sys.executable,
-            str(fsrs_path),
-            "schedule",
-            "--state",
-            state_arg,
-            "--grade",
-            str(grade),
-            "--now",
-            now,
-        ],
-        capture_output=True,
-        text=True,
-    )
+    cmd = [
+        sys.executable, str(fsrs_path), "schedule",
+        "--state", state_arg, "--grade", str(grade), "--now", now,
+    ]
+    if weights_path:  # personalized weights from adapters/fsrs_optimize, if present
+        cmd += ["--weights", weights_path]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise ValueError(
             f"fsrs schedule failed (exit {proc.returncode}): "
@@ -630,9 +622,16 @@ def _fsrs_cli_scheduler(state, grade: int, now: str) -> dict:
         raise ValueError(f"fsrs schedule returned non-JSON output: {exc}")
 
 
-def _default_scheduler():
-    """Return the default scheduler callable (CLI-backed)."""
-    return _fsrs_cli_scheduler
+def _track_weights_path(track_id: str, root: Path | None = None) -> str | None:
+    """Per-track personalized FSRS weights, if the optimizer adapter wrote one."""
+    p = track_dir(track_id, root) / "fsrs-weights.json"
+    return str(p) if p.exists() else None
+
+
+def _default_scheduler(track_id: str | None = None, root: Path | None = None):
+    """Default scheduler (CLI-backed); auto-uses per-track personalized weights if present."""
+    wp = _track_weights_path(track_id, root) if track_id else None
+    return lambda state, grade, now: _fsrs_cli_scheduler(state, grade, now, weights_path=wp)
 
 
 # ---------------------------------------------------------------------------
@@ -1144,7 +1143,7 @@ def grade_card(
     # A brand-new (or unseeded) card has no prior FSRS state.
     prior_for_fsrs = None if (prior is None or prior.get("state") == "new") else prior
 
-    sched = scheduler or _default_scheduler()
+    sched = scheduler or _default_scheduler(track_id, root)
     new_state = sched(prior_for_fsrs, grade, today)
     if not isinstance(new_state, dict) or "due" not in new_state:
         raise ValueError("scheduler returned an invalid card state")

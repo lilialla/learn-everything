@@ -251,11 +251,24 @@ tracks/                   YOUR learning data (gitignored)
 
 ## Roadmap
 
-The deferred feature backlog (exam & applied track modes, URL / long-document ingestion, an MCP
-server, personalized FSRS weights) is **intentionally frozen** until the core loop is demonstrably
-sticky for one real learner (≥10 cards on one track, ≥3 review days). Building breadth against an
-empty deck is the failure mode this project is deliberately avoiding. Designs for all of it live in
-[`plans/specs/2026-06-22-feature-designs.md`](plans/specs/2026-06-22-feature-designs.md).
+The former backlog is now **built (alpha) as out-of-core adapters + new modes**, so the stdlib
+core stays pip-free and CI stays green:
+
+- **`exam` & `applied` track modes** — `methods/exam.md` (syllabus → study → quiz → mock toward a
+  dated target) and `methods/applied.md` (learn-by-building; capture the traps).
+- **URL ingestion** (`adapters/url_ingest/`) — send a link → cleaned source markdown → the normal
+  teach loop. Web route works end-to-end; wechat/video/PDF hand off to existing scrapers.
+- **Long-document ingestion** — `scripts/structure.py` (stdlib splitter) + `methods/reading-guide.md`
+  (导读: a top-down syllabus, taught chunk-by-chunk) + `adapters/doc_ingest/` (OCR/extraction).
+- **MCP server** (`mcp/server.py`) — drive the same engine from any MCP-capable host.
+- **Personalized FSRS weights** (`adapters/fsrs_optimize/`) — fit weights from your own review
+  history; `scripts/fsrs.py` auto-loads a per-track `fsrs-weights.json` if present.
+
+> **Alpha caveat:** the dependency-bearing routes (live web fetch, OCR, the MCP handshake, the torch
+> optimizer) are wired and degrade gracefully when their optional deps are absent, but haven't yet
+> been exercised against live inputs at scale — validate before relying on them. The guiding
+> principle still holds: don't let breadth outrun a sticky core loop. Full designs:
+> [`plans/specs/2026-06-22-feature-designs.md`](plans/specs/2026-06-22-feature-designs.md).
 
 ## Status & honesty
 

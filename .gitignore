@@ -35,3 +35,7 @@ __pycache__/
 # Claude Code in-vault runtime; ship ONLY the discoverable skill symlink, nothing else.
 .claude/*
 !.claude/skills/
+
+# Personalized FSRS weights (fit from a learner's review history — personal data).
+# Per-track weights under tracks/ are already covered above; this is the global fit.
+/fsrs-weights.json
