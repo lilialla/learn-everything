@@ -172,5 +172,50 @@ class TestIngestGuards(unittest.TestCase):
             ingest_url("https://example.com/x", "", root=Path("/tmp"))
 
 
+class TestDelegation(unittest.TestCase):
+    """Provider delegation (reuse-not-rebuild) — no network, fake provider."""
+
+    def test_video_delegates_to_provider_and_reads_transcript(self):
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            prov = Path(d) / "fake_fetch.py"
+            prov.write_text(
+                "import sys, pathlib\n"
+                "wd = pathlib.Path(sys.argv[sys.argv.index('--workdir')+1])\n"
+                "(wd/'transcripts').mkdir(parents=True, exist_ok=True)\n"
+                "(wd/'transcripts'/'vid.md').write_text('# Real Title\\n\\nsubtitle body here',"
+                " encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            old = os.environ.get("LEARN_VIDEO_NOTES")
+            os.environ["LEARN_VIDEO_NOTES"] = str(prov)
+            try:
+                body, title, fetcher = mod._fetch_video(
+                    "https://www.bilibili.com/video/BV1", allow_login=False
+                )
+            finally:
+                if old is None:
+                    os.environ.pop("LEARN_VIDEO_NOTES", None)
+                else:
+                    os.environ["LEARN_VIDEO_NOTES"] = old
+            self.assertIn("subtitle body here", body)
+            self.assertEqual(title, "Real Title")
+            self.assertIn("video-notes", fetcher)
+
+    def test_video_no_provider_raises_friendly(self):
+        import os
+        old = os.environ.get("LEARN_VIDEO_NOTES")
+        os.environ["LEARN_VIDEO_NOTES"] = "/nonexistent/fetch_subtitles.py"
+        try:
+            with self.assertRaises(IngestError) as ctx:
+                mod._fetch_video("https://youtu.be/x", allow_login=False)
+            self.assertEqual(ctx.exception.source_type, "video")
+        finally:
+            if old is None:
+                os.environ.pop("LEARN_VIDEO_NOTES", None)
+            else:
+                os.environ["LEARN_VIDEO_NOTES"] = old
+
+
 if __name__ == "__main__":
     unittest.main()

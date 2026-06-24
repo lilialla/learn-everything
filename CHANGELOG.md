@@ -17,6 +17,10 @@ informal during alpha.
   - Personalized FSRS weights (`adapters/fsrs_optimize/`) + a `load_weights` hook in
     `scripts/fsrs.py` (per-track `fsrs-weights.json` auto-loaded when present).
   - Dep-bearing routes import-gracefully and aren't yet exercised against live inputs (alpha).
+- **url_ingest video/wechat now delegate to the proven local skills** (reuse-not-rebuild) instead
+  of stub hand-offs: resolves `video-notes` / `wechat-article-fetch` via `$LEARN_VIDEO_NOTES` /
+  `$LEARN_WECHAT_FETCH` or auto-probing `~/.claude`, shells out, and reads back the markdown. Those
+  skills are not vendored (license/stack); the route degrades to a friendly message if absent.
 
 ## [0.1.0-alpha] — 2026-06-24
 

@@ -273,6 +273,38 @@ def _empty(text: str) -> bool:
     return len((text or "").strip()) < 40
 
 
+def _find_provider(env_var: str, *glob_rels: str) -> Path | None:
+    """Resolve an existing local fetcher skill (reuse-not-rebuild). Prefers the
+    explicit env var (portable for any clone); else auto-probes the user's
+    ~/.claude install with globs (so we never hard-code a private plugin name).
+    Returns None when no provider is present (the route then degrades to a
+    friendly message — the public repo ships no scraper of its own here).
+    """
+    import os
+
+    explicit = os.environ.get(env_var)
+    if explicit and Path(explicit).exists():
+        return Path(explicit)
+    home = Path.home()
+    for rel in glob_rels:
+        for hit in sorted(home.glob(rel)):
+            if hit.exists():
+                return hit
+    return None
+
+
+def _run_provider(cmd: list, *, timeout: int = 300):
+    """Shell out to a provider skill; raise a typed IngestError on launch failure."""
+    import subprocess
+
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except FileNotFoundError as exc:
+        raise IngestError(f"provider runtime not found: {exc}")
+    except subprocess.TimeoutExpired:
+        raise IngestError("the fetch provider timed out")
+
+
 # ---------------------------------------------------------------------------
 # Per-type fetch routes — each wraps an existing tool, imported LAZILY.
 # Each returns (body_markdown, title, fetcher_name). They raise IngestError
@@ -343,78 +375,85 @@ def _fetch_web(url: str, *, allow_login: bool) -> tuple[str, str, str]:
 
 
 def _fetch_wechat(url: str, *, allow_login: bool) -> tuple[str, str, str]:
-    """微信公众号 (mp.weixin) — wraps the wechat-article-fetch skill
-    (Playwright headless). Public articles only.
+    """微信公众号 (mp.weixin) — DELEGATES to the wechat-article-fetch skill
+    (Node + Playwright, MIT). Resolve it via $LEARN_WECHAT_FETCH or by probing
+    ~/.claude for a wechat-article-fetch/scripts/fetch.js. Reuse-not-rebuild:
+    we run that proven scraper, never re-implement it here.
     """
-    try:
-        from playwright.sync_api import sync_playwright  # type: ignore  # noqa: F401
-    except ImportError:
+    import shutil
+    import tempfile
+
+    prov = _find_provider(
+        "LEARN_WECHAT_FETCH",
+        ".claude/plugins/*/skills/wechat-article-fetch/scripts/fetch.js",
+        ".claude/skills/wechat-article-fetch/scripts/fetch.js",
+    )
+    if not prov:
         raise IngestError(
-            "the 'wechat' route wraps the wechat-article-fetch skill, which "
-            "needs Playwright (`pip install playwright` + `playwright install "
-            "chromium`). Or run the wechat-article-fetch skill manually and "
-            "paste the resulting markdown.",
+            "wechat ingest reuses the wechat-article-fetch skill. Point "
+            "$LEARN_WECHAT_FETCH at its scripts/fetch.js (or install that skill), "
+            "or run it manually and paste the markdown.",
             "wechat", url,
         )
-    # Reuse-not-rebuild: defer to the wechat-article-fetch skill rather than
-    # re-implementing the Playwright scrape here. Surface it as a known limit
-    # until that skill exposes a clean importable entrypoint.
-    raise IngestError(
-        "wechat fetch is delegated to the wechat-article-fetch skill; run it "
-        "on this URL, then paste/point ingest at the produced markdown.",
-        "wechat", url,
-    )
+    if not shutil.which("node"):
+        raise IngestError(
+            "the wechat fetcher needs Node.js (node not found on PATH).",
+            "wechat", url,
+        )
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d) / "wechat.md"
+        proc = _run_provider(["node", str(prov), url, str(out)])
+        text = out.read_text(encoding="utf-8") if out.exists() else ""
+        if _empty(text):
+            tail = (proc.stderr or proc.stdout or "").strip()[-300:]
+            raise IngestError(
+                f"wechat fetch produced no article (login wall or changed page?). {tail}",
+                "wechat", url,
+            )
+        title = next((ln.lstrip("# ").strip() for ln in text.splitlines()
+                      if ln.strip()), url)
+        return text, (title or url), "wechat-article-fetch (playwright)"
 
 
 def _fetch_video(url: str, *, allow_login: bool) -> tuple[str, str, str]:
-    """Video subtitles via yt-dlp (wraps the video-notes skill). FunASR audio
-    fallback is OUT OF SCOPE here — if no subtitles, fail loudly so the skill
-    can route to video-notes/funasr-transcribe.
+    """Video (B站/YouTube/抖音) — DELEGATES to the video-notes skill (yt-dlp
+    subtitles, FunASR audio fallback). Resolve via $LEARN_VIDEO_NOTES or by
+    probing ~/.claude for video-notes/scripts/fetch_subtitles.py. We run that
+    proven pipeline and read back its transcript; we never re-implement it.
     """
-    try:
-        import yt_dlp  # type: ignore
-    except ImportError:
-        raise _missing_dep("yt-dlp", "video")
+    import tempfile
 
-    ydl_opts = {
-        "skip_download": True,
-        "writesubtitles": True,
-        "writeautomaticsub": True,
-        "quiet": True,
-        "no_warnings": True,
-    }
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-    except Exception as exc:
-        msg = str(exc).lower()
-        if "sign in" in msg or "bot" in msg or "login" in msg or "403" in msg:
-            raise IngestError(
-                "bot-check / login wall on the video host; YouTube/抖音 often "
-                "need a logged-in browser (run video-notes with --browser edge).",
-                "video", url,
-            )
-        raise IngestError(f"failed to read video metadata: {exc}", "video", url)
-
-    title = (info.get("title") or url) if isinstance(info, dict) else url
-    subs = {}
-    if isinstance(info, dict):
-        subs = info.get("subtitles") or info.get("automatic_captions") or {}
-    if not subs:
+    prov = _find_provider(
+        "LEARN_VIDEO_NOTES",
+        ".claude/plugins/*/skills/video-notes/scripts/fetch_subtitles.py",
+        ".claude/skills/video-notes/scripts/fetch_subtitles.py",
+    )
+    if not prov:
         raise IngestError(
-            "no subtitles available for this video. Audio transcription "
-            "(FunASR) is out of scope for this adapter — run the video-notes "
-            "skill (which falls back to funasr-transcribe) instead.",
+            "video ingest reuses the video-notes skill. Point $LEARN_VIDEO_NOTES "
+            "at its scripts/fetch_subtitles.py (or install that skill), or run it "
+            "manually and paste the transcript.",
             "video", url,
         )
-    # We have subtitle tracks but downloading/parsing them is the video-notes
-    # skill's job (handles VTT/SRT cleanup + langs). Hand off loudly.
-    raise IngestError(
-        "subtitles exist but transcript assembly is delegated to the "
-        "video-notes skill; run it on this URL and point ingest at the "
-        "produced markdown.",
-        "video", url,
-    )
+    with tempfile.TemporaryDirectory() as d:
+        proc = _run_provider([sys.executable, str(prov), "--workdir", d, url])
+        tdir = Path(d) / "transcripts"
+        mds = sorted(tdir.glob("*.md")) if tdir.exists() else []
+        if not mds:
+            tail = (proc.stderr or proc.stdout or "").strip()[-300:]
+            raise IngestError(
+                "no transcript produced — the video likely has no subtitles and "
+                "needs FunASR audio transcription. Run the video-notes skill fully "
+                f"(it handles that). {tail}",
+                "video", url,
+            )
+        text = mds[0].read_text(encoding="utf-8")
+        title = mds[0].stem
+        for line in text.splitlines():
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+        return text, (title or url), "video-notes (yt-dlp)"
 
 
 def _fetch_pdf(url: str, *, allow_login: bool, prefer_local: bool) -> tuple[str, str, str]:
