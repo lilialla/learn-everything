@@ -36,7 +36,8 @@ and quietly schedules spaced reviews so it actually sticks.
   comes before review material.
 - **Cross-track orchestration.** Every subject is a "track" under one board. Ask *"what should I do
   today?"* and it answers across all of them at once — what's due to review, what's stale, what's
-  near a deadline — and time-boxes a plan.
+  near a deadline — and time-boxes a plan (tested at 25+ concurrent tracks; tune any track's weight
+  or block size with `set-prefs`).
 - **It remembers you as a learner.** Every session leaves a memory digest, your
   misconceptions, the terms you asked about, and a resume pointer — so days later it reconstructs
   *"here's what you learned, where you got stuck, what's next."*

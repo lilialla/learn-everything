@@ -371,6 +371,41 @@ def update_track_meta(track_id: str, updates: dict, root: Path | None = None) ->
     _atomic_write_text(path, new_text)
 
 
+def set_prefs(
+    track_id: str,
+    *,
+    goal_weight: float | None = None,
+    minutes_per_new_block: int | None = None,
+    root: Path | None = None,
+) -> dict:
+    """Adjust a track's priority / time allocation (read by plan-day & status).
+
+    ``goal_weight`` scales how strongly plan-day favors this track; ``minutes_per_new_block``
+    sizes its "learn something new" block. Set either independently. This is the
+    user-facing knob the engine already supported but never exposed.
+    """
+    if not track_md_path(track_id, root).exists():
+        raise ValueError(f"unknown track '{track_id}'")
+    updates: dict = {}
+    if goal_weight is not None:
+        if goal_weight <= 0:
+            raise ValueError("goal_weight must be > 0")
+        updates["goal_weight"] = goal_weight
+    if minutes_per_new_block is not None:
+        if minutes_per_new_block <= 0:
+            raise ValueError("minutes_per_new_block must be > 0")
+        updates["minutes_per_new_block"] = minutes_per_new_block
+    if not updates:
+        raise ValueError(
+            "nothing to set — pass goal_weight and/or minutes_per_new_block"
+        )
+    update_track_meta(track_id, updates, root)
+    rebuild_registry(root)
+    # Frontmatter is stored as strings (consumers coerce via _num); report back the
+    # numeric values that were actually set.
+    return {"track": track_id, **updates}
+
+
 def append_log_row(
     track_id: str,
     today: str,
@@ -1703,6 +1738,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--track", required=True)
 
     sp = sub.add_parser(
+        "set-prefs", help="adjust a track's priority (goal-weight) / time (minutes per new block)"
+    )
+    sp.add_argument("--track", required=True)
+    sp.add_argument("--goal-weight", type=float, default=None, dest="goal_weight")
+    sp.add_argument(
+        "--minutes-per-new-block", type=int, default=None, dest="minutes_per_new_block"
+    )
+
+    sp = sub.add_parser(
         "ingest-check", help="pre-flight gate for INGEST (track ready? MISSION filled?)"
     )
     sp.add_argument("--track", required=True)
@@ -1816,6 +1860,14 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(leeches(args.track))
         elif args.command == "next-card-id":
             print(next_card_id(args.track))
+        elif args.command == "set-prefs":
+            _print_json(
+                set_prefs(
+                    args.track,
+                    goal_weight=args.goal_weight,
+                    minutes_per_new_block=args.minutes_per_new_block,
+                )
+            )
         elif args.command == "ingest-check":
             _print_json(ingest_check(args.track))
         elif args.command == "session-check":

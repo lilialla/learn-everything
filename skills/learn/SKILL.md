@@ -92,6 +92,7 @@ or show **how you're doing**." Internally these map to the flows below — but s
 status   : python3 scripts/registry.py status [--today YYYY-MM-DD]      # board + due_total + nudges
 plan-day : python3 scripts/registry.py plan-day [--minutes N] [--energy low|normal|high]
 create   : python3 scripts/registry.py create-track --id <id> --title <t> --mode domain --pedagogy <p> [--goal "..."]
+prefs    : python3 scripts/registry.py set-prefs --track <id> [--goal-weight N] [--minutes-per-new-block N]  # priority/time
 gate     : python3 scripts/registry.py ingest-check --track <id>        # is this track ready to learn into?
 add cards: echo '<json array>' | python3 scripts/registry.py add-cards --track <id>   # each card may carry "source"
 due      : python3 scripts/registry.py due [--track <id|all>]
@@ -181,6 +182,13 @@ the full "why" to a later nudge (don't gate the first lesson on it).
   - *Fetch:* `from adapters.url_ingest import ingest_url, IngestError` → `ingest_url(url, track_id)`
     writes the cleaned `…-source.md`; then continue the normal ingest on that file. If it still raises
     `IngestError` (bot-check / paywall / unsupported), say so plainly and ask them to paste the text.
+  - *Video login (say this up front for video links):* **B站** needs the user's login cookie at
+    `~/.config/video-notes-cookie.txt`; **YouTube / 抖音** read cookies from a logged-in browser —
+    the adapter passes `--browser edge` by default (override with `$LEARN_VIDEO_BROWSER=chrome|…`),
+    so the user just needs to be signed in there. A no-transcript `IngestError` will name which one
+    is missing — relay it; don't silently retry.
+  - *PDF links aren't fetched directly:* a `.pdf` URL hands off to the long-document path — have the
+    user download it, then use `adapters/doc_ingest` (the whole-book flow below).
   - The adapter writes ONLY the source file — all card/note/plan writes stay in the human-approved loop below.
 - **If it's a whole book / large PDF** (a big work, not an article): use the long-document path —
   `adapters/doc_ingest` (`extract`; route scanned PDFs through `mineru-ocr` / `case-files-to-md` per
@@ -311,4 +319,8 @@ traceable across sessions.
 - Deterministic work (ids, scheduling, due dates, the registry) is the engine's — run a command,
   don't guess numbers; report only the human meaning.
 - `methods/*.md` are your teaching playbooks — load the one that fits the material and learner.
+- **Priority is adjustable.** If the learner wants to spend more/less time on a subject (or
+  plan-day keeps deferring one they care about), offer `set-prefs --track <id> --goal-weight <N>`
+  (how strongly plan-day favors it) and/or `--minutes-per-new-block <N>` (block size). Don't make
+  them hand-edit TRACK.md.
 - When unsure what the user wants, show the overview. Always confirm before saving anything.

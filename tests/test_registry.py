@@ -621,6 +621,43 @@ class RegistryTestCase(unittest.TestCase):
         self.assertIn("source: https://example.com/x", t2)
         self.assertNotIn("source:", t3)
 
+    def test_set_prefs_roundtrips_and_surfaces_on_board(self):
+        self._make_track()
+        registry.add_card("python", "Q", "A", today=self.today, root=self.root)
+        res = registry.set_prefs(
+            "python", goal_weight=3.0, minutes_per_new_block=45, root=self.root
+        )
+        self.assertEqual(res["goal_weight"], 3.0)
+        self.assertEqual(res["minutes_per_new_block"], 45)
+        board = registry.status_board(self.today, self.root)
+        py = next(t for t in board["tracks"] if t["id"] == "python")
+        # stored as strings in frontmatter; consumers coerce numerically
+        self.assertEqual(float(py["goal_weight"]), 3.0)
+        self.assertEqual(int(py["minutes_per_new_block"]), 45)
+        # validation
+        with self.assertRaises(ValueError):
+            registry.set_prefs("python", goal_weight=0, root=self.root)
+        with self.assertRaises(ValueError):
+            registry.set_prefs("python", root=self.root)  # nothing to set
+
+    def test_scales_to_many_tracks(self):
+        for i in range(25):
+            tid = f"t{i:02d}"
+            registry.create_track(
+                tid, f"Track {i}", "domain", "tutor", today=self.today, root=self.root
+            )
+            registry.add_card(tid, "Q", "A", today=self.today, root=self.root)
+        board = registry.status_board(self.tomorrow, self.root)
+        self.assertEqual(len(board["tracks"]), 25)
+        self.assertGreaterEqual(board["due_total"], 25)
+        # cross-track planning works at scale and respects the time budget
+        plan = registry.plan_day(self.tomorrow, 60, "normal", root=self.root)
+        self.assertLessEqual(plan["summary"]["total_min"], 60)
+        self.assertGreaterEqual(plan["summary"]["blocks"], 1)
+        # nudge still produces a single coherent line across many tracks
+        line = registry.nudge(self.tomorrow, self.root)
+        self.assertIn("due across", line)
+
     def test_leeches_flags_repeatedly_failing_cards(self):
         self._make_track()
         registry.add_card("python", "Q", "A", today=self.today, root=self.root)

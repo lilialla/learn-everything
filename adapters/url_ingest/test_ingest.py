@@ -202,6 +202,42 @@ class TestDelegation(unittest.TestCase):
             self.assertEqual(title, "Real Title")
             self.assertIn("video-notes", fetcher)
 
+    def test_video_passes_browser_for_youtube_not_bilibili(self):
+        import json
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            dump = Path(d) / "argv.json"
+            prov = Path(d) / "fake_fetch.py"
+            prov.write_text(
+                "import sys, os, json, pathlib\n"
+                "json.dump(sys.argv, open(os.environ['LEARN_TEST_ARGV'], 'w'))\n"
+                "wd = pathlib.Path(sys.argv[sys.argv.index('--workdir')+1])\n"
+                "(wd/'transcripts').mkdir(parents=True, exist_ok=True)\n"
+                "(wd/'transcripts'/'v.md').write_text('# T\\n\\nbody', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            saved = {k: os.environ.get(k) for k in
+                     ("LEARN_VIDEO_NOTES", "LEARN_VIDEO_BROWSER", "LEARN_TEST_ARGV")}
+            os.environ["LEARN_VIDEO_NOTES"] = str(prov)
+            os.environ["LEARN_TEST_ARGV"] = str(dump)
+            os.environ.pop("LEARN_VIDEO_BROWSER", None)
+            try:
+                # YouTube -> default browser "edge" is passed through
+                mod._fetch_video("https://www.youtube.com/watch?v=x", allow_login=False)
+                argv = json.loads(dump.read_text())
+                self.assertIn("--browser", argv)
+                self.assertEqual(argv[argv.index("--browser") + 1], "edge")
+                # B站 -> no --browser (it uses the cookie file, not a browser)
+                mod._fetch_video("https://www.bilibili.com/video/BV1", allow_login=False)
+                argv2 = json.loads(dump.read_text())
+                self.assertNotIn("--browser", argv2)
+            finally:
+                for k, v in saved.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+
     def test_provider_resolves_to_vendored_when_no_env(self):
         """A fresh clone must find the vendored provider with no env/install."""
         import os

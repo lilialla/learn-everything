@@ -64,9 +64,16 @@ are imported at package import time; each loads only when its route runs.
 | web    | `requests`, `beautifulsoup4` (+ optional `readability-lxml`) | direct main-content extraction |
 | video  | the **video-notes** skill (Python + `yt-dlp`) | **delegated** — B站/YouTube/抖音 subtitles, FunASR audio fallback |
 | wechat | the **wechat-article-fetch** skill (Node + Playwright, MIT) | **delegated** — runs `node fetch.js` |
-| pdf    | `requests` | OCR delegated to `mineru-ocr` / `case-files-to-md-fast` (local, no upload) |
+| pdf    | `requests` | not fetched directly — a `.pdf` URL hands off to `adapters/doc_ingest` (download first) |
 
 `prefer_local=True` forces no-upload PDF routes for confidential tracks.
+
+**Video login (the part people hit at runtime):** B站 reads the user's login cookie
+from `~/.config/video-notes-cookie.txt`; YouTube/抖音 read cookies from a logged-in
+browser. The adapter passes `--browser edge` to the provider for YouTube/抖音 by
+default — override with `$LEARN_VIDEO_BROWSER` (e.g. `chrome`, `firefox`). A
+no-transcript `IngestError` names which one is missing (cookie file vs browser
+login) instead of failing silently.
 
 ## Providers — vendored, clone-and-go (video / wechat)
 

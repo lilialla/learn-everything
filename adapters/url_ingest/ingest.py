@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import os
 import re
 import sys
 import unicodedata
@@ -284,8 +285,6 @@ def _find_provider(env_var: str, vendored_rel: str, *glob_rels: str) -> Path | N
 
     Returns None only if every path is absent.
     """
-    import os
-
     explicit = os.environ.get(env_var)
     if explicit and Path(explicit).exists():
         return Path(explicit)
@@ -449,15 +448,36 @@ def _fetch_video(url: str, *, allow_login: bool) -> tuple[str, str, str]:
             "video", url,
         )
     with tempfile.TemporaryDirectory() as d:
-        proc = _run_provider([sys.executable, str(prov), "--workdir", d, url])
+        cmd = [sys.executable, str(prov), "--workdir", d, url]
+        # YouTube/抖音 need a logged-in browser's cookies (yt-dlp
+        # --cookies-from-browser); B站 uses ~/.config/video-notes-cookie.txt. Pass
+        # the browser through ($LEARN_VIDEO_BROWSER overrides; default "edge" for
+        # those hosts), which the adapter previously had no way to do.
+        browser = os.environ.get("LEARN_VIDEO_BROWSER")
+        host = (urlparse(url).hostname or "").lower()
+        needs_browser = any(
+            h in host for h in ("youtube.com", "youtu.be", "douyin.com", "iesdouyin.com")
+        )
+        if not browser and needs_browser:
+            browser = "edge"
+        if browser:
+            cmd += ["--browser", browser]
+        proc = _run_provider(cmd)
         tdir = Path(d) / "transcripts"
         mds = sorted(tdir.glob("*.md")) if tdir.exists() else []
         if not mds:
             tail = (proc.stderr or proc.stdout or "").strip()[-300:]
+            is_bili = "bilibili.com" in host or "b23.tv" in host
+            hint = (
+                "B站 needs your login cookie at ~/.config/video-notes-cookie.txt"
+                if is_bili
+                else "YouTube/抖音 need a logged-in browser — set $LEARN_VIDEO_BROWSER "
+                "(default edge) and be signed in there"
+            )
             raise IngestError(
-                "no transcript produced — the video likely has no subtitles and "
-                "needs FunASR audio transcription. Run the video-notes skill fully "
-                f"(it handles that). {tail}",
+                "no transcript produced — the video may have no subtitles (then it "
+                f"needs FunASR audio transcription, which the full video-notes skill does), "
+                f"or it needs login: {hint}. {tail}",
                 "video", url,
             )
         text = mds[0].read_text(encoding="utf-8")
