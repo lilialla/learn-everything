@@ -50,7 +50,7 @@ touch a command line.
 
 **Day 1 — one-time setup (~10 min):**
 
-1. **Get the files:** `git clone <your-fork-url> learn-everything`.
+1. **Get the files:** `git clone https://github.com/lilialla/learn-everything.git`.
 2. **Open it in Obsidian:** *Open folder as vault* → pick the `learn-everything` folder.
 3. **Add the [Claudian](https://github.com/YishenTu/claudian) plugin** (Community plugins →
    search "Claudian" → Install → Enable). It puts an AI tutor in the right sidebar that can read
