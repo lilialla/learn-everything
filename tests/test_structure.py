@@ -193,5 +193,69 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(out.returncode, 1)
 
 
+class CurriculumTestCase(unittest.TestCase):
+    """The big-book per-chunk teaching state machine (curriculum.json)."""
+
+    def setUp(self):
+        from pathlib import Path
+        self._tmp = tempfile.TemporaryDirectory()
+        self.rootp = Path(self._tmp.name)
+        (self.rootp / "tracks" / "book").mkdir(parents=True)
+        self.src = str(self.rootp / "securities-law.md")
+        with open(self.src, "w", encoding="utf-8") as fh:
+            fh.write(MARKDOWN_DOC)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_build_then_teach_chunk_by_chunk_to_done(self):
+        info = structure.build_curriculum(
+            "book", self.src, max_chars=120, root=self.rootp, today="2026-06-25"
+        )
+        total = info["total"]
+        self.assertGreater(total, 1)  # the doc splits into several chunks
+        self.assertTrue((self.rootp / "tracks" / "book" / "curriculum.json").exists())
+        seen = []
+        for _ in range(total + 1):
+            nxt = structure.next_chunk("book", root=self.rootp)
+            if nxt["done"]:
+                break
+            self.assertTrue(nxt["text"])  # real source text to teach
+            seen.append(nxt["chunk_id"])
+            structure.mark_chunk("book", nxt["chunk_id"], root=self.rootp, today="2026-06-25")
+        self.assertEqual(len(seen), total)
+        self.assertEqual(len(set(seen)), total)  # never repeats a chunk
+        self.assertTrue(structure.next_chunk("book", root=self.rootp)["done"])
+        st = structure.curriculum_status("book", self.rootp)
+        self.assertTrue(st["done"])
+        self.assertEqual(st["remaining"], 0)
+        self.assertEqual(st["percent"], 100)
+
+    def test_status_and_position_advance(self):
+        structure.build_curriculum("book", self.src, max_chars=120, root=self.rootp)
+        first = structure.next_chunk("book", root=self.rootp)
+        structure.mark_chunk("book", first["chunk_id"], root=self.rootp)
+        second = structure.next_chunk("book", root=self.rootp)
+        self.assertNotEqual(first["chunk_id"], second["chunk_id"])
+        st = structure.curriculum_status("book", self.rootp)
+        self.assertEqual(st["taught"], 1)
+        self.assertEqual(st["next_chunk_id"], second["chunk_id"])
+
+    def test_build_refuses_to_clobber_progress(self):
+        structure.build_curriculum("book", self.src, root=self.rootp)
+        with self.assertRaises(ValueError):
+            structure.build_curriculum("book", self.src, root=self.rootp)
+        structure.build_curriculum("book", self.src, root=self.rootp, force=True)
+
+    def test_next_chunk_without_curriculum_errors(self):
+        with self.assertRaises(ValueError):
+            structure.next_chunk("book", root=self.rootp)
+
+    def test_mark_unknown_chunk_errors(self):
+        structure.build_curriculum("book", self.src, root=self.rootp)
+        with self.assertRaises(ValueError):
+            structure.mark_chunk("book", "chunk-9999", root=self.rootp)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -126,19 +126,21 @@ if they abandon here, the track is unchanged (only the reusable extraction cache
 Once approved, the map becomes the track's living syllabus:
 
 - The approved `plan.md` is written.
+- The curriculum is built: `python3 scripts/structure.py curriculum-build --track <id> <source.md>`
+  writes `tracks/<id>/curriculum.json` — every chunk in document order, each `pending`, with the
+  source offsets so the tutor can pull each chunk's text on demand.
 - `TRACK.md` `next_action` is set to the first chunk in the recommended order
   (e.g. `读 ch1 §1，产出≤3张卡`). The machine-canonical position lives in `curriculum.json`;
   `next_action` is the human-readable derived view.
-- Each chunk's status starts `pending`.
 
 ## Progressive, resumable study (one chunk per session)
 
 After approval, study is NOT one marathon. Each session:
 
-1. **Resume** — pick the next chunk = the first `pending` chunk in recommended order whose
-   prerequisite chapters are already `taught` (the prereq gate; if prereqs are unsatisfiable,
-   fall back to recommended order). The picker is `scripts/structure.py next-chunk <track>`.
-   "Resume" jumps straight to the recorded position — never re-derive the map, never re-OCR.
+1. **Resume** — pick the next chunk = the first still-`pending` chunk in document (recommended)
+   order. The picker is `python3 scripts/structure.py next-chunk --track <id>`; it returns that
+   chunk's id, heading path, page range, and its source text to teach. "Resume" jumps straight to
+   the recorded position — never re-derive the map, never re-OCR.
 2. **Teach that one chunk** with the track's pedagogy (`methods/tutor.md` read-along +
    silent `methods/learner-model.md`), grounded ONLY in that chunk's source note plus its
    chapter summary as context. Not the whole book.
@@ -146,10 +148,11 @@ After approval, study is NOT one marathon. Each session:
    duplicate-check, refusal to atomize proofs). Each card stores a page-anchor backlink
    (`source: <work-id> p.137`, `chunk: <chunk-id>`) so the learner can jump back to the page.
 4. **Human approves cards** → cards written, FSRS seeds review state, the chunk is marked
-   `taught` (`scripts/structure.py mark <track> <chunk-id> taught`), and the position
+   `taught` (`python3 scripts/structure.py mark --track <id> --chunk <chunk-id>`), and the position
    advances. FSRS then schedules these cards into the normal cross-track `review` like any
    other track's cards.
-5. **Repeat** session by session until every chunk is `taught`.
+5. **Repeat** session by session until every chunk is `taught`
+   (`python3 scripts/structure.py curriculum-status --track <id>` shows taught / remaining / %).
 
 The learner can stop after any chunk and resume days later exactly where they left off — the
 position is the source of truth, not their memory.

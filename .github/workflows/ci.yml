@@ -14,4 +14,4 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run unit tests (stdlib only, no install step)
-        run: python -m unittest tests.test_fsrs tests.test_registry -v
+        run: python -m unittest tests.test_fsrs tests.test_registry tests.test_structure -v
