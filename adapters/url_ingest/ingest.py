@@ -561,6 +561,93 @@ def ingest_url(url: str, track: str, root: Path | None = None, *,
 
 
 # ---------------------------------------------------------------------------
+# First-use readiness preflight (no network, no fetch)
+# ---------------------------------------------------------------------------
+
+def readiness(url: str) -> dict:
+    """Report whether the route for this URL can actually run, and what to
+    install if not — WITHOUT touching the network.
+
+    This is a first-use preflight: link ingestion is a real product feature, so
+    the skill should tell the user up front "to learn from this kind of link,
+    install X" rather than letting it fail mid-fetch. Returns:
+    ``{source_type, ready: bool, missing: [labels], hint: str}``.
+    """
+    import shutil
+
+    st = classify(url)
+    missing: list[str] = []
+    hint = ""
+
+    if st == "unknown":
+        return {"source_type": st, "ready": False, "missing": [],
+                "hint": "unsupported link — paste the text instead."}
+
+    if st == "web":
+        for mod_name, pip_name in (("requests", "requests"),
+                                   ("bs4", "beautifulsoup4")):
+            try:
+                __import__(mod_name)
+            except ImportError:
+                missing.append(pip_name)
+        if missing:
+            hint = "pip install " + " ".join(missing)
+
+    elif st == "pdf":
+        try:
+            __import__("requests")
+        except ImportError:
+            missing.append("requests")
+        if missing:
+            hint = "pip install requests"
+
+    elif st == "video":
+        prov = _find_provider(
+            "LEARN_VIDEO_NOTES",
+            "providers/video-notes/scripts/fetch_subtitles.py",
+            ".claude/plugins/*/skills/video-notes/scripts/fetch_subtitles.py",
+            ".claude/skills/video-notes/scripts/fetch_subtitles.py",
+        )
+        if not prov:
+            missing.append("video-notes provider (should be vendored under providers/)")
+        has_ytdlp = bool(shutil.which("yt-dlp"))
+        if not has_ytdlp:
+            try:
+                __import__("yt_dlp")
+                has_ytdlp = True
+            except ImportError:
+                pass
+        if not has_ytdlp:
+            missing.append("yt-dlp")
+            hint = "pip install yt-dlp"
+
+    elif st == "wechat":
+        prov = _find_provider(
+            "LEARN_WECHAT_FETCH",
+            "providers/wechat-article-fetch/scripts/fetch.js",
+            ".claude/plugins/*/skills/wechat-article-fetch/scripts/fetch.js",
+            ".claude/skills/wechat-article-fetch/scripts/fetch.js",
+        )
+        if not prov:
+            missing.append("wechat-article-fetch provider (should be vendored under providers/)")
+        parts: list[str] = []
+        if not shutil.which("node"):
+            missing.append("Node.js")
+            parts.append("install Node.js")
+        # Playwright lives in the provider dir's node_modules (npm install).
+        pw = prov.parent.parent / "node_modules" / "playwright" if prov else None
+        if pw is None or not pw.exists():
+            missing.append("Playwright (npm install)")
+            if prov:
+                parts.append(f"run `npm install` in {prov.parent.parent}")
+        if parts:
+            hint = "; ".join(parts)
+
+    return {"source_type": st, "ready": not missing,
+            "missing": missing, "hint": hint}
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -570,7 +657,10 @@ def main(argv: list[str] | None = None) -> int:
         description="URL -> markdown source for a learn-everything track.",
     )
     parser.add_argument("--url", required=True, help="the source URL to ingest")
-    parser.add_argument("--track", required=True, help="target track id")
+    parser.add_argument("--track", default=None, help="target track id")
+    parser.add_argument("--check", action="store_true",
+                        help="preflight only: report whether this link's fetcher "
+                             "is installed and what to install if not (no fetch)")
     parser.add_argument("--root", default=None,
                         help="repo root (defaults to the auto-detected root)")
     parser.add_argument("--allow-login", action="store_true",
@@ -580,6 +670,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--today", default=None,
                         help="override the date stamp (YYYY-MM-DD), for tests")
     args = parser.parse_args(argv)
+
+    if args.check:
+        r = readiness(args.url)
+        if r["ready"]:
+            print(f"ready [{r['source_type']}] — this link can be ingested.")
+            return 0
+        print(f"NOT READY [{r['source_type']}] — to learn from this link, install:")
+        for m in r["missing"]:
+            print(f"  - {m}")
+        if r["hint"]:
+            print(f"  how: {r['hint']}")
+        return 2
+
+    if not args.track:
+        parser.error("--track is required (unless using --check)")
 
     try:
         result = ingest_url(

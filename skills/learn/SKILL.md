@@ -167,12 +167,18 @@ the full "why" to a later nudge (don't gate the first lesson on it).
   Then set the primary text per the **Two-panes rule**: verbatim material → this cleaned source is
   what they read; expository material → also write a distilled `…-lesson.md` as the primary read and
   link the source. State which in one line before you start teaching.
-- **If they gave a URL** (optional adapter): call `adapters/url_ingest` to fetch + clean it into that
-  `…-source.md`, then continue the normal ingest on that file:
-  `from adapters.url_ingest import ingest_url, IngestError` → `ingest_url(url, track_id)`. If the
-  adapter or a route's deps are absent, or it raises `IngestError` (bot-check / paywall / unsupported),
-  say so plainly and ask them to paste the text (or install the optional deps). The adapter writes
-  ONLY the source file — all card/note/plan writes stay in the human-approved loop below.
+- **If they gave a URL**: first **preflight, then fetch.**
+  - *Preflight (first use of a link type):* run `python3 adapters/url_ingest/ingest.py --check --url <u>`.
+    If it prints `NOT READY`, the fetcher for this link type isn't installed yet. Tell the user
+    plainly — framed as **required product setup, not an optional extra**: "To learn from
+    {video / 微信公众号} links, learn-everything needs {yt-dlp / Node.js + Playwright} installed once.
+    Here's the command: `<the hint it printed>`." Offer to run it for them if it's safe (`pip install`),
+    or have them run it; then re-check. Don't attempt the fetch until it's ready. (The deterministic
+    core needs none of this — only link ingestion does.)
+  - *Fetch:* `from adapters.url_ingest import ingest_url, IngestError` → `ingest_url(url, track_id)`
+    writes the cleaned `…-source.md`; then continue the normal ingest on that file. If it still raises
+    `IngestError` (bot-check / paywall / unsupported), say so plainly and ask them to paste the text.
+  - The adapter writes ONLY the source file — all card/note/plan writes stay in the human-approved loop below.
 - **If it's a whole book / large PDF** (a big work, not an article): use the long-document path —
   `adapters/doc_ingest` (`extract`; route scanned PDFs through `mineru-ocr` / `case-files-to-md` per
   its `needs_ocr` handoff) → `python3 scripts/structure.py split` → then the **导读 reading-guide**

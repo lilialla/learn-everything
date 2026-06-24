@@ -43,9 +43,16 @@ unsupported / missing optional dependency.
 ## CLI
 
 ```bash
+# first-use preflight (no network): is this link's fetcher installed?
+python3 adapters/url_ingest/ingest.py --check --url <u>
+# fetch
 python3 adapters/url_ingest/ingest.py --url <u> --track <id>
             [--allow-login] [--prefer-local] [--root <path>] [--today YYYY-MM-DD]
 ```
+
+`--check` reports `ready` / `NOT READY` plus exactly what to install (it powers
+the skill's first-use "install the required fetcher" prompt). `readiness(url)` is
+the importable form.
 
 ## Optional dependencies (lazy-imported, friendly hint if missing)
 

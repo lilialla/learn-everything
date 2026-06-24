@@ -25,6 +25,11 @@ informal during alpha.
   demand and the route raises a friendly hint if they're missing. `wechat-article-fetch`'s MIT
   `LICENSE.txt` is retained verbatim; `video-notes` keeps its personal-study-use note. See
   `providers/README.md`.
+- **First-use install preflight for link ingestion.** `adapters/url_ingest/ingest.py --check --url <u>`
+  reports (no network) whether a link's fetcher is ready and what to install if not; `readiness(url)`
+  exposes the same. `skills/learn` runs it before fetching and, when not ready, tells the user this is
+  required product setup (e.g. `pip install yt-dlp`, or Node.js + `npm install` for 微信) before
+  proceeding — rather than failing mid-fetch.
 
 ## [0.1.0-alpha] — 2026-06-24
 

@@ -234,5 +234,32 @@ class TestDelegation(unittest.TestCase):
                 os.environ["LEARN_WECHAT_FETCH"] = old_w
 
 
+class TestReadiness(unittest.TestCase):
+    """First-use preflight — structure + that the vendored providers register."""
+
+    def test_unknown_not_ready(self):
+        r = mod.readiness("ftp://nope/x")
+        self.assertEqual(r["source_type"], "unknown")
+        self.assertFalse(r["ready"])
+
+    def test_shape_for_web(self):
+        r = mod.readiness("https://example.com/post")
+        self.assertEqual(r["source_type"], "web")
+        self.assertIsInstance(r["missing"], list)
+        self.assertIsInstance(r["hint"], str)
+        self.assertIn("ready", r)
+
+    def test_vendored_providers_not_reported_missing(self):
+        # The provider itself ships vendored, so it must never be in `missing`
+        # (only the runtime deps like yt-dlp / Node / Playwright may be).
+        for url in ("https://www.bilibili.com/video/BV1",
+                    "https://mp.weixin.qq.com/s/abc"):
+            r = mod.readiness(url)
+            self.assertFalse(
+                any("provider" in m for m in r["missing"]),
+                f"vendored provider wrongly reported missing for {url}: {r['missing']}",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
