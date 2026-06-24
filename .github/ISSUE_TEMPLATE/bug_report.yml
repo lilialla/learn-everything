@@ -1,0 +1,44 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please **do not paste personal learning data, source documents,
+        or secrets** — describe the problem in general terms.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what actually happened?
+      placeholder: I asked the tutor to ... and it ...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: false
+  - type: dropdown
+    id: surface
+    attributes:
+      label: How are you running it?
+      options:
+        - Inside Obsidian (Claudian)
+        - Claude Code in a terminal
+        - Calling the CLI directly
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: OS, Python version (python3 --version), Obsidian/Claudian version if relevant
+    validations:
+      required: false
