@@ -274,7 +274,9 @@ def _empty(text: str) -> bool:
     return len((text or "").strip()) < 40
 
 
-def _find_provider(env_var: str, vendored_rel: str, *glob_rels: str) -> Path | None:
+def _find_provider(
+    env_var: str, vendored_rel: str, *glob_rels: str, prefer=None
+) -> Path | None:
     """Resolve a fetcher provider, in priority order:
 
     1. explicit env var (portable override for any clone / CI / custom path);
@@ -283,22 +285,35 @@ def _find_provider(env_var: str, vendored_rel: str, *glob_rels: str) -> Path | N
     3. auto-probe the user's ``~/.claude`` install (an already-present skill is
        reused; we never hard-code a private plugin name).
 
+    ``prefer`` (optional): a predicate ``Path -> bool`` for "actually runnable".
+    When given, the first candidate that BOTH exists AND satisfies it wins; if
+    none qualifies we fall back to the first that merely exists (so callers still
+    get a path to point an install hint at). This is why a wechat provider with
+    no resolvable Playwright is skipped in favor of one that has it — instead of
+    picking the vendored copy that can't actually run.
+
     Returns None only if every path is absent.
     """
+    candidates: list[Path] = []
     explicit = os.environ.get(env_var)
-    if explicit and Path(explicit).exists():
-        return Path(explicit)
+    if explicit:
+        candidates.append(Path(explicit))
     # Vendored-in-repo copy (self-contained clone). Anchored to the CODE repo,
     # not the caller's data root, so it's found regardless of where tracks/ live.
     code_root = Path(__file__).resolve().parent.parent.parent
-    vendored = code_root / vendored_rel
-    if vendored.exists():
-        return vendored
+    candidates.append(code_root / vendored_rel)
     home = Path.home()
     for rel in glob_rels:
-        for hit in sorted(home.glob(rel)):
-            if hit.exists():
-                return hit
+        candidates.extend(sorted(home.glob(rel)))
+
+    existing = [c for c in candidates if c.exists()]
+    if not existing:
+        return None
+    if prefer is not None:
+        for c in existing:
+            if prefer(c):
+                return c
+    return existing[0]
     return None
 
 
@@ -397,6 +412,7 @@ def _fetch_wechat(url: str, *, allow_login: bool) -> tuple[str, str, str]:
         "providers/wechat-article-fetch/scripts/fetch.js",
         ".claude/plugins/*/skills/wechat-article-fetch/scripts/fetch.js",
         ".claude/skills/wechat-article-fetch/scripts/fetch.js",
+        prefer=lambda p: _node_has_playwright(p.parent.parent),
     )
     if not prov:
         raise IngestError(
@@ -584,6 +600,34 @@ def ingest_url(url: str, track: str, root: Path | None = None, *,
 # First-use readiness preflight (no network, no fetch)
 # ---------------------------------------------------------------------------
 
+def _node_has_playwright(start: Path | None, *, check_global: bool = True) -> bool:
+    """Is Playwright resolvable for a Node script under ``start``?
+
+    Mirrors Node's own module resolution instead of looking in one fixed dir:
+    walk UP from the script's directory checking each ``node_modules/playwright``
+    (covers a local `npm install` at any ancestor), then fall back to the GLOBAL
+    npm root (covers `npm i -g playwright`). This is why the old fixed-path probe
+    false-negatived a globally-installed Playwright.
+    """
+    if start is not None:
+        d = Path(start).resolve()
+        for p in (d, *d.parents):
+            if (p / "node_modules" / "playwright").exists():
+                return True
+    if check_global:
+        import subprocess
+
+        try:
+            r = subprocess.run(
+                ["npm", "root", "-g"], capture_output=True, text=True, timeout=10
+            )
+            if r.returncode == 0 and (Path(r.stdout.strip()) / "playwright").exists():
+                return True
+        except Exception:
+            pass
+    return False
+
+
 def readiness(url: str) -> dict:
     """Report whether the route for this URL can actually run, and what to
     install if not — WITHOUT touching the network.
@@ -647,6 +691,7 @@ def readiness(url: str) -> dict:
             "providers/wechat-article-fetch/scripts/fetch.js",
             ".claude/plugins/*/skills/wechat-article-fetch/scripts/fetch.js",
             ".claude/skills/wechat-article-fetch/scripts/fetch.js",
+            prefer=lambda p: _node_has_playwright(p.parent.parent),
         )
         if not prov:
             missing.append("wechat-article-fetch provider (should be vendored under providers/)")
@@ -654,12 +699,13 @@ def readiness(url: str) -> dict:
         if not shutil.which("node"):
             missing.append("Node.js")
             parts.append("install Node.js")
-        # Playwright lives in the provider dir's node_modules (npm install).
-        pw = prov.parent.parent / "node_modules" / "playwright" if prov else None
-        if pw is None or not pw.exists():
+        # Playwright resolves via Node: a local node_modules at any ancestor of the
+        # provider, OR a global `npm i -g playwright`. (Not just the provider dir.)
+        prov_dir = prov.parent.parent if prov else None
+        if not _node_has_playwright(prov_dir):
             missing.append("Playwright (npm install)")
-            if prov:
-                parts.append(f"run `npm install` in {prov.parent.parent}")
+            if prov_dir:
+                parts.append(f"run `npm install` in {prov_dir} (or install Playwright globally)")
         if parts:
             hint = "; ".join(parts)
 

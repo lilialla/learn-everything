@@ -297,5 +297,74 @@ class TestReadiness(unittest.TestCase):
             )
 
 
+class TestProviderResolution(unittest.TestCase):
+    """Playwright detection mirrors Node resolution; provider pick prefers runnable."""
+
+    def test_node_has_playwright_walks_up(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "node_modules" / "playwright").mkdir(parents=True)
+            deep = root / "wechat" / "scripts"
+            deep.mkdir(parents=True)
+            # found at an ancestor, global check off for determinism
+            self.assertTrue(mod._node_has_playwright(deep, check_global=False))
+
+    def test_node_has_playwright_absent(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertFalse(
+                mod._node_has_playwright(Path(d) / "x" / "y", check_global=False)
+            )
+        self.assertFalse(mod._node_has_playwright(None, check_global=False))
+
+    def test_find_provider_prefers_runnable(self):
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            # a runnable provider: fetch.js with a sibling node_modules/playwright
+            scripts = root / "prov" / "scripts"
+            scripts.mkdir(parents=True)
+            fetch = scripts / "fetch.js"
+            fetch.write_text("//", encoding="utf-8")
+            (root / "prov" / "node_modules" / "playwright").mkdir(parents=True)
+            old = os.environ.get("LEARN_WECHAT_FETCH")
+            os.environ["LEARN_WECHAT_FETCH"] = str(fetch)
+            try:
+                got = mod._find_provider(
+                    "LEARN_WECHAT_FETCH",
+                    "providers/wechat-article-fetch/scripts/fetch.js",
+                    prefer=lambda p: mod._node_has_playwright(
+                        p.parent.parent, check_global=False
+                    ),
+                )
+                self.assertEqual(got, fetch)  # runnable env candidate wins
+            finally:
+                if old is None:
+                    os.environ.pop("LEARN_WECHAT_FETCH", None)
+                else:
+                    os.environ["LEARN_WECHAT_FETCH"] = old
+
+    def test_find_provider_falls_back_to_first_existing(self):
+        import os
+        with tempfile.TemporaryDirectory() as d:
+            fetch = Path(d) / "fetch.js"
+            fetch.write_text("//", encoding="utf-8")
+            old = os.environ.get("LEARN_WECHAT_FETCH")
+            os.environ["LEARN_WECHAT_FETCH"] = str(fetch)
+            try:
+                # nothing is "preferred" → returns the first existing path so the
+                # caller still has a target for its install hint
+                got = mod._find_provider(
+                    "LEARN_WECHAT_FETCH",
+                    "providers/wechat-article-fetch/scripts/fetch.js",
+                    prefer=lambda p: False,
+                )
+                self.assertEqual(got, fetch)
+            finally:
+                if old is None:
+                    os.environ.pop("LEARN_WECHAT_FETCH", None)
+                else:
+                    os.environ["LEARN_WECHAT_FETCH"] = old
+
+
 if __name__ == "__main__":
     unittest.main()
