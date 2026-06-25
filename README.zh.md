@@ -175,6 +175,15 @@ registry.json         # 所有轨道的可重建缓存(绝不是唯一来源)
 让整次运行崩溃。整文件写入是原子的(临时文件 + 改名),在 Google Drive / Dropbox 同步下安全。
 
 <details>
+<summary><b>边车 JSON 结构</b></summary>
+
+- `review-state.json` —— `{ "<card-id>": {stability, difficulty, due, reps, lapses, last_review, state} }`
+- `review-log.jsonl` —— 每次评分一行:`{date, card, grade, due, reps, lapses, state}`
+- `questions-log.jsonl` —— 每个提问一行:`{date, concept, question, term?}`
+- `curriculum.json` —— `{title, source_file, structure_source, built, max_chars, total, position, chunks:[{chunk_id, title, heading_path, page_range, start, end, char_len, status, taught_on}]}`
+</details>
+
+<details>
 <summary><b>CLI 参考(导师替你调,你很少需要直接用)</b></summary>
 
 引擎是三个标准库脚本。`registry.py` 管所有状态;`structure.py` 管长文档切分 + 整本书课程表;

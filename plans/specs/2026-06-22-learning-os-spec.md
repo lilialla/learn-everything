@@ -31,6 +31,11 @@ plugin (no private data baked in) and serves the author's real tracks as gitigno
 
 ## Non-Goals
 
+> **Status note (2026-06-25):** these were the *MVP* non-goals. The deferred items below
+> (`exam`/`applied` modes, URL/long-document ingestion, MCP, FSRS weights) have since been built
+> as optional out-of-core modules — see the CHANGELOG `[Unreleased]`. Kept as a dated snapshot of
+> the original MVP scope.
+
 - **MVP excludes `exam` and `applied` modes.** Only the orchestration spine + `domain`
   mode + shared review engine ship first. (IELTS already covers `exam` via the author's
   existing private `ielts-*` skills; that suite is NOT migrated or wrapped in MVP.)

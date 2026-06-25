@@ -82,5 +82,6 @@ end-to-end; teaching-dialogue quality depends on the host model and isn't yet ba
   is gitignored and never leaves the machine.
 - Deferred/frozen backlog: exam & applied modes, URL / long-document ingestion, MCP server,
   personalized FSRS weights — see `plans/specs/2026-06-22-feature-designs.md`.
+  **(True at 0.1.0-alpha only; the backlog has since been unfrozen and shipped — see [Unreleased].)**
 
 [Unreleased]: https://github.com/lilialla/learn-everything/compare/main...HEAD

@@ -204,6 +204,15 @@ engine rebuilds / degrades gracefully and warns to stderr — it never loses the
 never crashes the run. Full-file writes are atomic (tmp + rename), safe under Google Drive / Dropbox sync.
 
 <details>
+<summary><b>Sidecar JSON shapes</b></summary>
+
+- `review-state.json` — `{ "<card-id>": {stability, difficulty, due, reps, lapses, last_review, state} }`
+- `review-log.jsonl` — one line per grade: `{date, card, grade, due, reps, lapses, state}`
+- `questions-log.jsonl` — one line per question: `{date, concept, question, term?}`
+- `curriculum.json` — `{title, source_file, structure_source, built, max_chars, total, position, chunks:[{chunk_id, title, heading_path, page_range, start, end, char_len, status, taught_on}]}`
+</details>
+
+<details>
 <summary><b>CLI reference (the tutor runs these for you — you rarely need them directly)</b></summary>
 
 The engine is three stdlib scripts. `registry.py` owns all state; `structure.py` handles
