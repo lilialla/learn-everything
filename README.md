@@ -21,7 +21,7 @@ any Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others).
 language; it teaches one concept at a time, captures what you understood (and where you stumbled),
 and quietly schedules spaced reviews so it actually sticks.
 
-`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 76 passing`
+`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 77 passing`
 
 > You're usually learning several things at once — a professional domain, an exam, a coding skill —
 > and each needs a *different* kind of teaching, so you lose the thread every time you switch.
@@ -186,36 +186,46 @@ tracks/<id>/
                       #   (Obsidian spaced-repetition compatible)
   notes/<date>-*.md   # the source you're reading + the tutor's lesson notes
   learning-records/   # dated decision-grade insights (corrected misconceptions, etc.)
-  review-state.json   # FSRS sidecar: per-card stability/difficulty/due/reps/lapses/state
+  glossary.md         # terms you asked about (a map of what was hard)
+  review-state.json   # FSRS sidecar: per-card stability/difficulty/due/reps/lapses/last_review/state
   review-log.jsonl    # append-only grading history
   questions-log.jsonl # append-only ad-hoc questions (the heatmap source)
+  curriculum.json     # big-book teaching state (chunk list + taught/pending), when a book is loaded
+  fsrs-weights.json   # optional: personalized FSRS weights fit from your review history
 
 registry.json         # REBUILDABLE cache of all tracks (never the sole source)
 ```
 
-If `registry.json` or a `review-state.json` goes missing or corrupt, the engine rebuilds /
-degrades gracefully and warns to stderr — it never loses the source of truth and never crashes the
-run. Full-file writes are atomic (tmp + rename), safe under Google Drive / Dropbox sync.
+The **engine** (`scripts/`) writes: `TRACK.md` frontmatter/Log, `cards/`, the `*.json`/`*.jsonl`
+sidecars, `curriculum.json`, and `registry.json`. The **tutor** (skill) writes the human-readable
+memory — `MISSION.md`, `CONTEXT.md`, `plan.md`, `notes/`, `learning-records/`, `glossary.md` — as
+plain markdown (no CLI). If `registry.json` or a `review-state.json` goes missing or corrupt, the
+engine rebuilds / degrades gracefully and warns to stderr — it never loses the source of truth and
+never crashes the run. Full-file writes are atomic (tmp + rename), safe under Google Drive / Dropbox sync.
 
 <details>
 <summary><b>CLI reference (the tutor runs these for you — you rarely need them directly)</b></summary>
 
-The engine is two stdlib scripts. `registry.py` owns all state; `fsrs.py` is the scheduler.
+The engine is three stdlib scripts. `registry.py` owns all state; `structure.py` handles
+long-document splitting + the big-book curriculum; `fsrs.py` is the scheduler.
 
 ```bash
 # orientation & planning
 python3 scripts/registry.py status [--today YYYY-MM-DD]        # board, leads with cards due
+python3 scripts/registry.py nudge                             # ONE plain line of what's due (daily-note/cron)
 python3 scripts/registry.py plan-day [--minutes N] [--energy low|normal|high]
 python3 scripts/registry.py progress [--track <id|all>]        # total / graduated / 7-day accuracy
 
-# starting & gating a track
+# starting, tuning & gating a track
 python3 scripts/registry.py create-track --id <id> --title <t> --mode domain --pedagogy <p> [--deadline YYYY-MM-DD] [--goal "..."]
+python3 scripts/registry.py set-prefs --track <id> [--goal-weight N] [--minutes-per-new-block N]
 python3 scripts/registry.py ingest-check --track <id>          # ready to learn into? (MISSION set?)
-python3 scripts/registry.py session-check --track <id>         # did this session leave a card or a reason?
+python3 scripts/registry.py session-check [--strict [--review]] --track <id>   # close gate (strict = card+log+next+CONTEXT today)
 
 # cards & review
-echo '[{"question":"...","answer":"...","tags":["L2"]}]' | python3 scripts/registry.py add-cards --track <id>
+echo '[{"question":"...","answer":"...","tags":["L2"],"source":"..."}]' | python3 scripts/registry.py add-cards --track <id>
 python3 scripts/registry.py due [--track <id|all>] [--today YYYY-MM-DD]
+python3 scripts/registry.py leeches --track <id>              # cards that keep failing — re-teach, not re-quiz
 python3 scripts/registry.py grade --track <id> --card <card-id> --grade <1-4> [--today YYYY-MM-DD]
 
 # memory & signals
@@ -224,9 +234,18 @@ python3 scripts/registry.py log-question --track <id> --concept "<C>" --question
 python3 scripts/registry.py questions [--track <id|all>]       # where you asked most, ranked
 python3 scripts/registry.py rebuild                            # rebuild registry.json from TRACK.md
 
+# long documents (big books): split → teach chunk-by-chunk, resumable
+python3 scripts/structure.py split <file.md> [--max-chars N]
+python3 scripts/structure.py curriculum-build --track <id> <source.md>
+python3 scripts/structure.py next-chunk --track <id>          # next pending chunk + its text
+python3 scripts/structure.py mark --track <id> --chunk <chunk-id>
+python3 scripts/structure.py curriculum-status --track <id>   # taught / remaining / %
+
 # scheduler (called by registry.py; usable standalone)
 python3 scripts/fsrs.py schedule --state '<json|->' --grade <1-4> --now YYYY-MM-DD
 ```
+
+(Utility/admin: `add-card` single-card, `next-card-id` — rarely needed directly.)
 
 Grades: `1`=Again `2`=Hard `3`=Good `4`=Easy. When `--today` is omitted it defaults to the system date.
 </details>
@@ -258,7 +277,7 @@ skills/learn/SKILL.md     the single host-adapter skill (+ FEEDBACK.md improveme
 methods/*.md              the pedagogy toolkit (data, not code): 7 standalone + 3 layers + modes
 scripts/registry.py       all track/card/registry/planner state I/O (stdlib)
 scripts/fsrs.py           FSRS-6 scheduler (stdlib)
-tests/                    unit tests (76, CI) — engine + long-doc splitter/curriculum
+tests/                    unit tests (77, CI) — engine + long-doc splitter/curriculum
 plans/                    design specs, feature designs, architecture/optimization plans
 docs/                     audits + the architecture optimization plan
 tracks/                   YOUR learning data (gitignored)
@@ -294,7 +313,7 @@ core stays pip-free and CI stays green:
 ## Status & honesty
 
 This is **alpha**. What's solid and tested: the deterministic engine, the full state machine, every
-CLI, and all file artifacts — end-to-end across every flow (76 unit tests + a from-zero acceptance
+CLI, and all file artifacts — end-to-end across every flow (77 unit tests + a from-zero acceptance
 run, all green). What only a real session can prove: the **quality of the teaching dialogue itself**
 (that depends on the host model). It hasn't yet been battle-tested across months and many subjects —
 that's the next milestone, not a build task.

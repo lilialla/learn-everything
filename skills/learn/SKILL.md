@@ -196,10 +196,11 @@ the full "why" to a later nudge (don't gate the first lesson on it).
   (`methods/reading-guide.md`): a top-down map becomes the track's `plan.md` syllabus (HUMAN APPROVAL
   before writing). On approval, build the curriculum (the track must already exist — `create-track`
   first): `python3 scripts/structure.py curriculum-build --track <id> <source.md>`. Then teach it
-  **one chunk per session**: `next-chunk --track <id>` gives you the next pending chunk *and its
-  text* → teach only that → distill cards (each with `source: <work> p.N / chunk-NNNN`) → on approval
-  `mark --track <id> --chunk <chunk-id>`; `curriculum-status --track <id>` shows % done. Don't try to
-  teach a 300-page book in one go.
+  **one chunk per session**: `python3 scripts/structure.py next-chunk --track <id>` gives you the next
+  pending chunk *and its text* → teach only that → distill cards (each with `source: <work> p.N /
+  chunk-NNNN`) → on approval `python3 scripts/structure.py mark --track <id> --chunk <chunk-id>`;
+  `python3 scripts/structure.py curriculum-status --track <id>` shows % done. Don't try to teach a
+  300-page book in one go.
 
 **BEAT 2 — Diagnose, then teach in dialogue (the actual learning — never skip).**
 - First find out where they are: ask, one question at a time, what they already know, their goal,

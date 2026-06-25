@@ -26,6 +26,11 @@ duplicated here, and the CORE is never modified.
   | `log_question` | `log_question` | record one ad-hoc learner question |
   | `questions` | `questions_stats` | where the learner asked most (ranked) |
 
+  Some newer engine commands (`nudge`, `leeches`, `set-prefs`, the long-document
+  `structure.py` curriculum commands) are **CLI-only** and not yet exposed as MCP
+  tools — they're driven by the `learn` skill directly. File an issue if you want
+  them over MCP.
+
 - **Prompts** — every `methods/*.md` pedagogy template (`tutor`, `socratic`,
   `feynman`, `active-recall`, …) as an MCP prompt.
 - **Resources** — each track under `tracks/<id>/` as `learn://track/<id>` (its

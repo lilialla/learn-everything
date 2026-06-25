@@ -22,7 +22,7 @@ informal during alpha.
     results return as UNTRUSTED data to weigh and cite (lazy backend, no core dependency).
   - Honesty fixes: method selection is documented as the tutor's heuristic judgment (not an
     algorithmic selector); the toolkit is described as 7 standalone + 3 composable layers + modes;
-    `tests.test_structure` added to CI; test count synced (CI → 76).
+    `tests.test_structure` added to CI; test count synced (CI → 77).
 - **Docs repositioning.** Reframed the project as a host-agnostic **Skill** that installs into any
   Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others) — Obsidian + Claudian
   is now presented as one *recommended* setup, not a requirement. Removed comparative/"not a card

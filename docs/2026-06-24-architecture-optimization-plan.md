@@ -1,5 +1,11 @@
 # learn skill — architecture optimization plan (to MATURE & USABLE)
 
+> **SUPERSEDED (2026-06-25) — historical snapshot.** This plan recommended *freezing* the deferred
+> backlog (exam/applied modes, URL/long-document ingestion, MCP, FSRS weights). That decision was
+> later reversed: those features are now **built as optional out-of-core adapters/modes** (see the
+> CHANGELOG `[Unreleased]`). Read the P0/P1 *maturity* items below as the rationale that shaped the
+> current `skills/learn` design; ignore the "freeze the backlog" recommendation — it no longer holds.
+
 Date: 2026-06-24
 Synthesizer input: 5-dimension audit (invocation/feedback, memory, teaching quality, UX/小白化, adversarial maturity).
 Scope: take `skills/learn` from "MVP shipped + audited" to "mature & usable" with the SMALLEST change set.
