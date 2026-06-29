@@ -50,13 +50,17 @@ from pathlib import Path
 
 # adapters/doc_ingest/ingest_doc.py -> repo root is two parents up.
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from adapters.safety import (  # noqa: E402
+    UNTRUSTED_CLOSE,
+    UNTRUSTED_OPEN,
+    wrap_untrusted_text,
+)
 
 # Sample this many bytes per page-equivalent when sniffing text vs scanned PDF.
 SCANNED_PDF_CHARS_PER_PAGE = 100  # below this avg => probably scanned/image
-
-# DATA_BOUNDARY markers (must match methods/reading-guide.md + rules/common).
-UNTRUSTED_OPEN = "<<<UNTRUSTED_INPUT>>>"
-UNTRUSTED_CLOSE = "<<<END_UNTRUSTED>>>"
 
 
 def repo_root() -> Path:
@@ -64,7 +68,12 @@ def repo_root() -> Path:
 
 
 def track_dir(track: str, root: Path | None = None) -> Path:
-    return (root or repo_root()) / "tracks" / track
+    scripts = repo_root() / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    import registry  # type: ignore  # noqa: PLC0415
+
+    return registry.track_dir(track, root or repo_root())
 
 
 def sources_dir(track: str, root: Path | None = None) -> Path:
@@ -295,47 +304,10 @@ def _ocr_handoff_message(path: Path, no_upload: bool) -> str:
 # DATA_BOUNDARY wrapping + injection scan
 # ---------------------------------------------------------------------------
 
-_INJECTION_PHRASES = (
-    "ignore previous instructions",
-    "ignore all previous",
-    "new system prompt",
-    "from now on",
-    "disregard the above",
-    "忽略前面",
-    "忽略以上",
-    "按我说的做",
-    "新的系统提示",
-)
-_ZERO_WIDTH = ("​", "‌", "‍", "﻿")
-_DIR_OVERRIDE = ("‮", "‭")
-
-
-def scan_for_injection(text: str) -> list[str]:
-    """Return a list of red-flag descriptions found in untrusted text."""
-    flags: list[str] = []
-    low = text.lower()
-    for phrase in _INJECTION_PHRASES:
-        if phrase in low:
-            flags.append(f"imperative phrase: {phrase!r}")
-    zw = sum(text.count(c) for c in _ZERO_WIDTH)
-    if zw >= 5:
-        flags.append(f"dense zero-width characters (count={zw})")
-    for c in _DIR_OVERRIDE:
-        if c in text:
-            flags.append("direction-override character present")
-            break
-    return flags
-
-
 def wrap_untrusted(text: str) -> tuple[str, list[str]]:
     """Wrap extracted text in DATA_BOUNDARY markers; prepend an injection
     warning header when >=3 red flags are present. Returns (wrapped, flags)."""
-    flags = scan_for_injection(text)
-    header = ""
-    if len(flags) >= 3:
-        header = "[PROMPT_INJECTION_DETECTED] " + "; ".join(flags) + "\n\n"
-    body = f"{UNTRUSTED_OPEN}\n{text}\n{UNTRUSTED_CLOSE}\n"
-    return header + body, flags
+    return wrap_untrusted_text(text, include_flag_details=True)
 
 
 # ---------------------------------------------------------------------------

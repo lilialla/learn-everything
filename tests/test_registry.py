@@ -12,7 +12,7 @@ import json
 import sys
 import tempfile
 import unittest
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 # Make scripts/ importable regardless of where the test runner is launched.
@@ -77,6 +77,21 @@ class RegistryTestCase(unittest.TestCase):
         self._make_track()
         with self.assertRaises(ValueError):
             self._make_track()
+
+    def test_create_track_rejects_path_traversal_ids(self):
+        bad_ids = ["", "../outside", "a/b", "a\\b", "..", ".", "/tmp/x", "a..b"]
+        for track_id in bad_ids:
+            with self.subTest(track_id=track_id):
+                with self.assertRaises(ValueError):
+                    registry.create_track(
+                        track_id,
+                        "Bad",
+                        "domain",
+                        "socratic",
+                        today=self.today,
+                        root=self.root,
+                    )
+        self.assertFalse((self.root / "outside").exists())
 
     def test_next_card_id_progression(self):
         self._make_track()

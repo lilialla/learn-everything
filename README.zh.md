@@ -256,6 +256,7 @@ scripts/structure.py      长文档切分 + curriculum 状态机(标准库)
 scripts/fsrs.py           FSRS-6 调度器(标准库)
 scripts/security_check.py 仓库 secret + 隐私 ignore 检查
 adapters/                 可选 out-of-core 摄入/搜索/优化适配器
+adapters/safety.py        共享非可信数据边界 + 注入扫描规则
 mcp/server.py             同一内核之上的可选 MCP 宿主适配器
 tests/                    单元测试(CI 全量 discovery)——引擎 + 适配器 + 长文档课程表
 plans/                    设计规格、功能设计、架构/优化计划

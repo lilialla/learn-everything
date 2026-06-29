@@ -54,34 +54,20 @@ The output `fsrs-weights.json` files are **personal data** and are gitignored
 (they live under `tracks/` or the repo root alongside other learner state) —
 never commit them.
 
-## Integration note (CORE wiring the maintainer adds — do NOT edit `fsrs.py`)
+## Integration note
 
-The adapter only *writes* the weights file. For `scripts/fsrs.py` to *use* it,
-add a tiny stdlib loader + precedence walk to `fsrs.py` (no new imports). The
-exact hook is in the parent task's integration notes; in short:
+The adapter only *writes* the weights file. The stdlib core already knows how
+to read it:
 
-```python
-# scripts/fsrs.py — add (stdlib only):
-def load_weights(path):
-    """Load a 21-float weight vector from a fsrs-weights.json, or None."""
-    try:
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
-        w = data["weights"] if isinstance(data, dict) else data
-        if isinstance(w, list) and len(w) == 21 and all(
-            isinstance(x, (int, float)) for x in w
-        ):
-            return [float(x) for x in w]
-    except (OSError, ValueError, KeyError, TypeError):
-        pass
-    return None  # malformed -> caller falls back to DEFAULT_WEIGHTS, never crash
-```
+- `scripts/fsrs.py load_weights(path)` accepts either `{"weights": [...]}` or a
+  raw 21-number list and falls back safely on missing or malformed files.
+- `scripts/fsrs.py schedule --weights <path>` passes loaded weights into the
+  scheduler.
+- `scripts/registry.py` automatically passes a per-track
+  `tracks/<id>/fsrs-weights.json` when present.
 
-Then in the `schedule` CLI branch, resolve weights by precedence
-`--weights <path>` → per-track `tracks/<id>/fsrs-weights.json` → global
-`<root>/fsrs-weights.json` → `DEFAULT_WEIGHTS`, and pass the result as
-`schedule(..., w=resolved)`. `schedule()` already accepts `w=`, so no formula
-changes are needed.
+Malformed or missing weights never crash scheduling; the built-in defaults are
+used instead.
 
 ## Tests
 

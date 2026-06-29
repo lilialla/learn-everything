@@ -81,6 +81,18 @@ class ToolMappingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.server.call_tool("does-not-exist", {})
 
+    def test_create_track_rejects_path_traversal_id(self) -> None:
+        with self.assertRaises(ValueError):
+            self.server.call_tool(
+                "create_track",
+                {
+                    "id": "../outside",
+                    "title": "Bad",
+                    "mode": "domain",
+                    "pedagogy": "socratic",
+                },
+            )
+
     def test_prompts_enumerate_methods(self) -> None:
         names = {p["name"] for p in self.server.list_method_prompts()}
         # 'tutor' is the orchestration method that always ships.

@@ -290,6 +290,7 @@ scripts/structure.py      long-document splitter + curriculum state machine (std
 scripts/fsrs.py           FSRS-6 scheduler (stdlib)
 scripts/security_check.py repository secret + privacy-ignore check
 adapters/                 optional out-of-core ingestion/search/optimization adapters
+adapters/safety.py        shared untrusted-data markers + injection scanning
 mcp/server.py             optional MCP host adapter over the same core
 tests/                    unit tests (full discovery in CI) — engine + adapters + long-doc curriculum
 plans/                    design specs, feature designs, architecture/optimization plans

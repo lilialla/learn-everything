@@ -7,8 +7,8 @@ shells out to the subcommands defined here.
 Source of truth: per-track tracks/<id>/TRACK.md (YAML frontmatter + Log table).
 registry.json at repo root is a REBUILDABLE cache, never the sole source.
 
-Stdlib only: argparse, json, datetime, pathlib, re, math (math unused but
-allowed). No third-party deps, no pyyaml.
+Stdlib only: argparse, json, datetime, pathlib, re, tempfile. No third-party
+deps, no pyyaml.
 """
 
 from __future__ import annotations
@@ -21,6 +21,8 @@ import sys
 import tempfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
+import jsonl
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -50,6 +52,7 @@ MIN_PER_NEW_BLOCK = 30  # default minutes for a "learn something new" block
 REANCHOR_MIN = 5  # quick "what was this track about" touch for a stale track
 DEFAULT_BUDGET_MIN = 60  # default daily time budget when none given
 MISSION_STUB_MARKER = "<!-- learn-everything:mission-stub -->"
+INVALID_TRACK_ID_CHARS = {"/", "\\"}
 
 
 def tracks_dir(root: Path | None = None) -> Path:
@@ -206,7 +209,35 @@ def parse_frontmatter(text: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def track_dir(track_id: str, root: Path | None = None) -> Path:
-    return tracks_dir(root) / track_id
+    safe_id = validate_track_id(track_id)
+    base = tracks_dir(root).resolve()
+    path = (base / safe_id).resolve()
+    try:
+        path.relative_to(base)
+    except ValueError as exc:
+        raise ValueError(f"invalid track id {track_id!r}") from exc
+    return path
+
+
+def validate_track_id(track_id: str) -> str:
+    """Return a safe track id or raise ValueError.
+
+    Track ids become directory names under ``tracks/`` and can be supplied via
+    CLI/MCP/adapter calls. Keep the rule narrow enough to prevent path traversal
+    without imposing an ASCII-only naming policy.
+    """
+    if not isinstance(track_id, str):
+        raise ValueError("track id must be a string")
+    cleaned = track_id.strip()
+    if not cleaned:
+        raise ValueError("track id is required")
+    if cleaned in {".", ".."} or ".." in cleaned:
+        raise ValueError(f"invalid track id {track_id!r}")
+    if any(ch in cleaned for ch in INVALID_TRACK_ID_CHARS):
+        raise ValueError(f"invalid track id {track_id!r}")
+    if Path(cleaned).is_absolute():
+        raise ValueError(f"invalid track id {track_id!r}")
+    return cleaned
 
 
 def track_md_path(track_id: str, root: Path | None = None) -> Path:
@@ -533,10 +564,7 @@ def append_review_log(track_id: str, entry: dict, root: Path | None = None) -> N
     warn and continue rather than raise.
     """
     try:
-        path = review_log_path(track_id, root)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        jsonl.append_jsonl(review_log_path(track_id, root), entry)
     except OSError as exc:  # pragma: no cover - defensive
         _warn(f"could not append review-log for '{track_id}' ({exc}); continuing")
 
@@ -728,6 +756,7 @@ def create_track(
     root: Path | None = None,
 ) -> Path:
     """Scaffold a new track. Errors (ValueError) if the id already exists."""
+    track_id = validate_track_id(track_id)
     tdir = track_dir(track_id, root)
     if tdir.exists():
         raise ValueError(f"track '{track_id}' already exists at {tdir}")
@@ -1500,19 +1529,7 @@ def session_close_check(
 
 
 def _read_review_log(track_id: str, root: Path | None = None) -> list[dict]:
-    path = review_log_path(track_id, root)
-    if not path.exists():
-        return []
-    out: list[dict] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            out.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
-    return out
+    return jsonl.read_jsonl(review_log_path(track_id, root))
 
 
 def progress(
@@ -1604,10 +1621,7 @@ def log_question(
     if term:
         entry["term"] = term.strip()
     try:
-        path = questions_log_path(track_id, root)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        jsonl.append_jsonl(questions_log_path(track_id, root), entry)
     except OSError as exc:  # pragma: no cover - defensive
         _warn(f"could not append questions-log for '{track_id}' ({exc}); continuing")
     return entry
@@ -1631,17 +1645,7 @@ def questions_stats(
 
     rows = []
     for tid in track_ids:
-        entries = []
-        path = questions_log_path(tid, root)
-        if path.exists():
-            for line in path.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
+        entries = jsonl.read_jsonl(questions_log_path(tid, root))
         by_concept: dict[str, dict] = {}
         for e in entries:
             c = e.get("concept") or "(uncategorized)"

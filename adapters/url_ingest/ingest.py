@@ -41,32 +41,21 @@ import unicodedata
 from pathlib import Path
 from urllib.parse import urlparse
 
-# DATA_BOUNDARY markers — fetched content goes between these and is DATA only.
-UNTRUSTED_OPEN = "<<<UNTRUSTED_INPUT>>>"
-UNTRUSTED_CLOSE = "<<<END_UNTRUSTED>>>"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from adapters.safety import (  # noqa: E402
+    PROMPT_INJECTION_MARKER,
+    UNTRUSTED_CLOSE,
+    UNTRUSTED_OPEN,
+    escape_untrusted_markers,
+    scan_prompt_injection,
+)
 
 # A long source past this many characters is flagged truncated/handoff-worthy
 # (Long-Document Ingestion handles chunking; this adapter only flags it).
 LARGE_SOURCE_CHARS = 60_000
-
-# Injection red-flag patterns. >=3 hits => treat the whole body as suspicious.
-_INJECTION_PHRASES = (
-    "ignore previous instructions",
-    "ignore all previous",
-    "disregard previous",
-    "new system prompt",
-    "new instructions",
-    "from now on",
-    "you are now",
-    "system:",
-    "忽略前面",
-    "忽略以上",
-    "忽略之前",
-    "按我说的做",
-)
-# Zero-width / direction-override characters that hide injected instructions.
-_ZERO_WIDTH = ("​", "‌", "‍", "﻿")
-_DIRECTION_OVERRIDE = ("‮", "‭")
 
 
 class IngestError(Exception):
@@ -167,17 +156,7 @@ def scan_injection(text: str) -> dict:
     red flags => flagged (caller prepends ``[PROMPT_INJECTION_DETECTED]`` and
     keeps the body as DATA only). Stdlib only.
     """
-    hits: list[str] = []
-    low = (text or "").lower()
-    for phrase in _INJECTION_PHRASES:
-        if phrase in low:
-            hits.append(f"phrase:{phrase}")
-    zw_total = sum(text.count(z) for z in _ZERO_WIDTH) if text else 0
-    if zw_total >= 5:
-        hits.append(f"zero-width:{zw_total}")
-    if text and any(d in text for d in _DIRECTION_OVERRIDE):
-        hits.append("direction-override")
-    return {"flagged": len(hits) >= 3, "hits": hits, "count": len(hits)}
+    return scan_prompt_injection(text)
 
 
 def source_md_path(track: str, slug: str, *, root: Path | None = None,
@@ -186,9 +165,8 @@ def source_md_path(track: str, slug: str, *, root: Path | None = None,
 
     tracks/<id>/notes/<date>-<slug>-source.md  — matches skills/learn/SKILL.md.
     """
-    base = _resolve_root(root)
     day = today or datetime.date.today().isoformat()
-    return base / "tracks" / track / "notes" / f"{day}-{slug}-source.md"
+    return _track_dir(track, root) / "notes" / f"{day}-{slug}-source.md"
 
 
 def build_source_md(*, body: str, title: str, source_url: str,
@@ -208,14 +186,14 @@ def build_source_md(*, body: str, title: str, source_url: str,
         f"injection_flagged: {'true' if injection_flagged else 'false'}",
         "---",
     ]
-    lead = "[PROMPT_INJECTION_DETECTED]\n\n" if injection_flagged else ""
+    lead = f"{PROMPT_INJECTION_MARKER}\n\n" if injection_flagged else ""
     return (
         "\n".join(meta_lines)
         + "\n"
         + lead
         + UNTRUSTED_OPEN
         + "\n"
-        + (body or "").strip()
+        + escape_untrusted_markers((body or "").strip())
         + "\n"
         + UNTRUSTED_CLOSE
         + "\n"
@@ -240,6 +218,15 @@ def _resolve_root(root: Path | None) -> Path:
     except Exception:
         # Fallback: repo root is two levels up from adapters/url_ingest/.
         return Path(__file__).resolve().parent.parent.parent
+
+
+def _track_dir(track: str, root: Path | None = None) -> Path:
+    scripts = Path(__file__).resolve().parent.parent.parent / "scripts"
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    import registry  # type: ignore  # noqa: PLC0415
+
+    return registry.track_dir(track, _resolve_root(root))
 
 
 def _yaml_scalar(value: str) -> str:
@@ -314,7 +301,6 @@ def _find_provider(
             if prefer(c):
                 return c
     return existing[0]
-    return None
 
 
 def _run_provider(cmd: list, *, timeout: int = 300):
@@ -322,11 +308,16 @@ def _run_provider(cmd: list, *, timeout: int = 300):
     import subprocess
 
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except FileNotFoundError as exc:
         raise IngestError(f"provider runtime not found: {exc}")
     except subprocess.TimeoutExpired:
         raise IngestError("the fetch provider timed out")
+    if proc.returncode != 0:
+        tail = ((proc.stderr or "") + "\n" + (proc.stdout or "")).strip()[-300:]
+        detail = f": {tail}" if tail else ""
+        raise IngestError(f"fetch provider exited with code {proc.returncode}{detail}")
+    return proc
 
 
 # ---------------------------------------------------------------------------
@@ -569,7 +560,10 @@ def ingest_url(url: str, track: str, root: Path | None = None, *,
     truncated = len(body) > LARGE_SOURCE_CHARS
 
     slug = slugify(title) or slugify(urlparse(url).path) or "source"
-    out_path = source_md_path(track, slug, root=root, today=today)
+    try:
+        out_path = source_md_path(track, slug, root=root, today=today)
+    except ValueError as exc:
+        raise IngestError(str(exc), source_type, url) from exc
     if not out_path.parent.exists():
         out_path.parent.mkdir(parents=True, exist_ok=True)
 

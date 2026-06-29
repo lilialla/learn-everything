@@ -309,10 +309,7 @@ function downloadImage(url, filepath) {
 
       fileStream.on('error', (err) => {
         // 删除不完整的文件
-        try {
-          const fs = require('fs');
-          fs.unlink(filepath, () => {});
-        } catch (e) {}
+        unlink(filepath).catch(() => {});
         reject(err);
       });
     });
@@ -493,6 +490,9 @@ function isMainModuleCheck() {
     // 方法1: 直接路径比较（Windows 兼容）
     const mainPath = fileURLToPath(import.meta.url);
     const argvPath = process.argv[1];
+    if (!argvPath) {
+      return false;
+    }
 
     // 规范化路径后再比较
     const normalizedMain = mainPath.replace(/\\/g, '/');
@@ -509,7 +509,7 @@ function isMainModuleCheck() {
     return mainFileName === argvFileName && argvFileName.includes('fetch.js');
   } catch (error) {
     // 如果路径检测失败，回退到简单检查
-    return process.argv[1].includes('fetch.js');
+    return Boolean(process.argv[1] && process.argv[1].includes('fetch.js'));
   }
 }
 

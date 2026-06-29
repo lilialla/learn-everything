@@ -8,7 +8,6 @@ deps and always run.
 """
 
 import importlib.util
-import json
 import os
 import sys
 import tempfile
@@ -69,6 +68,11 @@ class TestPassthroughAndCache(unittest.TestCase):
         self.assertEqual(res["structure_source"], "headings")
         self.assertGreaterEqual(res["n_chunks"], 1)
         self.assertTrue(Path(res["structure_path"]).is_file())
+
+    def test_track_traversal_rejected(self):
+        with self.assertRaises(ValueError):
+            I.raw_dir("../outside", root=self.root)
+        self.assertFalse((self.root / "outside").exists())
 
 
 class TestInjectionScan(unittest.TestCase):

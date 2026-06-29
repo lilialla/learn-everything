@@ -28,25 +28,16 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Same DATA_BOUNDARY markers the rest of the project uses for untrusted content.
-UNTRUSTED_OPEN = "<<<UNTRUSTED_INPUT>>>"
-UNTRUSTED_CLOSE = "<<<END_UNTRUSTED>>>"
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-# Built-in fallback if url_ingest's scanner isn't importable. Kept in sync with
-# adapters/url_ingest/ingest.py:_INJECTION_PHRASES so the two paths flag the same.
-_INJECTION_PHRASES = (
-    "ignore previous instructions",
-    "ignore all previous",
-    "disregard previous",
-    "new system prompt",
-    "new instructions",
-    "from now on",
-    "you are now",
-    "system:",
-    "忽略前面",
-    "忽略以上",
-    "忽略之前",
-    "按我说的做",
+from adapters.safety import (  # noqa: E402
+    PROMPT_INJECTION_MARKER,
+    UNTRUSTED_CLOSE,
+    UNTRUSTED_OPEN,
+    escape_untrusted_markers,
+    scan_prompt_injection,
 )
 
 
@@ -60,16 +51,8 @@ class WebSearchError(Exception):
 
 
 def _scan_injection(text: str) -> dict:
-    """Flag prompt-injection in a result (reuse url_ingest's scanner if present)."""
-    try:
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-        from adapters.url_ingest.ingest import scan_injection  # type: ignore
-
-        return scan_injection(text)
-    except Exception:
-        low = (text or "").lower()
-        count = sum(1 for p in _INJECTION_PHRASES if p in low)
-        return {"flagged": count >= 3, "count": count}
+    """Flag prompt-injection in a result."""
+    return scan_prompt_injection(text)
 
 
 def _backend() -> tuple[str | None, str | None]:
@@ -106,6 +89,12 @@ def _run_command(cmd: str, query: str, max_results: int) -> list:
         raise WebSearchError(f"backend command not found: {exc}", query)
     except subprocess.TimeoutExpired:
         raise WebSearchError("web search timed out", query)
+    if proc.returncode != 0:
+        tail = ((proc.stderr or "") + "\n" + (proc.stdout or "")).strip()[-300:]
+        detail = f": {tail}" if tail else ""
+        raise WebSearchError(
+            f"backend exited with code {proc.returncode}{detail}", query
+        )
     out = (proc.stdout or "").strip()
     if not out:
         tail = (proc.stderr or "").strip()[-200:]
@@ -183,7 +172,7 @@ def format_results_md(result: dict) -> str:
     """Render results as markdown wrapped in DATA_BOUNDARY markers (untrusted)."""
     head = []
     if result.get("injection_flagged"):
-        head.append("[PROMPT_INJECTION_DETECTED]")
+        head.append(PROMPT_INJECTION_MARKER)
     head.append(f"# Web search: {result['query']}")
     head.append("")
     head.append(
@@ -193,9 +182,10 @@ def format_results_md(result: dict) -> str:
     body = []
     for i, r in enumerate(result["results"], 1):
         body.append(f"{i}. **{r['title']}** — {r['url']}\n   {r['snippet']}")
+    body_text = escape_untrusted_markers("\n".join(body))
     return (
         "\n".join(head) + "\n\n" + UNTRUSTED_OPEN + "\n"
-        + "\n".join(body) + "\n" + UNTRUSTED_CLOSE + "\n"
+        + body_text + "\n" + UNTRUSTED_CLOSE + "\n"
     )
 
 

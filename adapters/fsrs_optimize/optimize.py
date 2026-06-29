@@ -49,6 +49,7 @@ if str(_REPO_ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT / "scripts"))
 
 import registry  # noqa: E402  (stdlib-only CORE module)
+import jsonl  # noqa: E402
 
 # fsrs-optimizer / FSRS-6 weight vectors are length 21 (w[0..20]).
 WEIGHTS_LEN = 21
@@ -83,22 +84,7 @@ def read_review_log(track_id: str, root: Path | None = None) -> list[dict]:
     skipped (a corrupt history line must not abort the whole fit). Returns
     [] if the log does not exist.
     """
-    path = registry.review_log_path(track_id, root)
-    if not path.exists():
-        return []
-    rows: list[dict] = []
-    with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except (json.JSONDecodeError, ValueError):
-                continue  # skip a single bad line, keep the rest
-            if isinstance(obj, dict):
-                rows.append(obj)
-    return rows
+    return jsonl.read_jsonl(registry.review_log_path(track_id, root))
 
 
 def _date_to_review_time_ms(date_str: str, seq: int) -> int:
