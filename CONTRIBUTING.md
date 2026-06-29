@@ -9,7 +9,9 @@ No dependencies — the engine is Python standard library only.
 ```bash
 git clone https://github.com/lilialla/learn-everything.git
 cd learn-everything
-python3 -m unittest tests.test_fsrs tests.test_registry tests.test_structure -v   # 77 tests, all should pass
+python3 -m unittest discover -v
+python3 -m unittest mcp.test_server -v
+python3 scripts/security_check.py --history
 ```
 
 ## Invariants (please don't break these)
@@ -38,7 +40,7 @@ These are the load-bearing design rules; PRs that violate them will be asked to 
 - **A new engine command** → add the function + an argparse subparser + a `main()` branch in
   `scripts/registry.py`, and a test in `tests/test_registry.py`. Prefer read-mostly operations;
   keep writes atomic.
-- **The former "frozen backlog" is now shipped** as optional, out-of-core modules (alpha):
+- **The former deferred backlog is now shipped** as optional, out-of-core modules (alpha):
   exam/applied modes (`methods/exam.md`, `methods/applied.md`), URL ingestion
   (`adapters/url_ingest/`), long-document ingestion + curriculum (`scripts/structure.py` +
   `methods/reading-guide.md` + `adapters/doc_ingest/`), web search (`adapters/web_search/`), the MCP
@@ -48,7 +50,9 @@ These are the load-bearing design rules; PRs that violate them will be asked to 
 
 ## PR checklist
 
-- [ ] `python3 -m unittest tests.test_fsrs tests.test_registry tests.test_structure` passes (the CI set).
+- [ ] `python3 -m unittest discover -v` passes.
+- [ ] `python3 -m unittest mcp.test_server -v` passes.
+- [ ] `python3 scripts/security_check.py --history` passes.
 - [ ] No personal/learner data or secrets in the diff (check `git diff --cached`).
 - [ ] Invariants above hold.
 - [ ] If behavior changed, a test asserts the new behavior.

@@ -13,9 +13,11 @@
 
 ## Checklist
 
-- [ ] `python3 -m unittest tests.test_fsrs tests.test_registry` passes
+- [ ] `python3 -m unittest discover -v` passes
+- [ ] `python3 -m unittest mcp.test_server -v` passes
+- [ ] `python3 scripts/security_check.py --history` passes
 - [ ] No personal/learner data or secrets in the diff
 - [ ] Invariants hold (pip-free stdlib core · markdown = source of truth · cards Obsidian-SR
       compatible · teach-first · nothing persisted without approval · DATA_BOUNDARY · privacy)
 - [ ] If behavior changed, a test asserts it
-- [ ] Not building the frozen backlog (see CONTRIBUTING.md)
+- [ ] Optional adapters stay out-of-core, lazy-dependency, and covered by focused tests

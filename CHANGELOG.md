@@ -6,6 +6,9 @@ informal during alpha.
 
 ## [Unreleased]
 
+- **Control-plane drift fixes.** CI now runs full unittest discovery, MCP smoke tests, and the
+  repository secret check. Contributor docs and GitHub templates no longer advertise the old frozen
+  backlog policy or static test counts.
 - **Six-pillar audit follow-through — four substantive gaps closed:**
   - **Memory now actually persists (P0).** A non-skippable close gate
     (`session-check --strict`) requires a card-or-reason + a Log row today + a `next_action` + a
@@ -22,13 +25,14 @@ informal during alpha.
     results return as UNTRUSTED data to weigh and cite (lazy backend, no core dependency).
   - Honesty fixes: method selection is documented as the tutor's heuristic judgment (not an
     algorithmic selector); the toolkit is described as 7 standalone + 3 composable layers + modes;
-    `tests.test_structure` added to CI; test count synced (CI → 77).
+    `tests.test_structure` added to CI and the current test commands are documented without relying
+    on static counts.
 - **Docs repositioning.** Reframed the project as a host-agnostic **Skill** that installs into any
   Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others) — Obsidian + Claudian
   is now presented as one *recommended* setup, not a requirement. Removed comparative/"not a card
   factory"/"not just the material" marketing copy (the product is original; there is no peer or prior
   version to contrast against) in favor of positive statements of what it does. Internal SKILL
-  behavioral rules (teach-before-cards) are unchanged. Corrected stale engine test count (44 → 46)
+  behavioral rules (teach-before-cards) are unchanged. Corrected stale engine test-count references
   across README/README.zh/CHANGELOG/CONTRIBUTING; synced the 中文 roadmap/credits with English.
 - Community health files (CONTRIBUTING, SECURITY, issue/PR templates), bilingual README, CI.
 - **Unfroze the deferred backlog as out-of-core adapters + modes** (alpha; stdlib core stays
@@ -80,8 +84,8 @@ end-to-end; teaching-dialogue quality depends on the host model and isn't yet ba
 ### Notes
 - Privacy-first: learner data (`tracks/`, `profile.md`, `registry.json`, `.obsidian/`, `.claudian/`)
   is gitignored and never leaves the machine.
-- Deferred/frozen backlog: exam & applied modes, URL / long-document ingestion, MCP server,
-  personalized FSRS weights — see `plans/specs/2026-06-22-feature-designs.md`.
+- At 0.1.0-alpha, exam & applied modes, URL / long-document ingestion, MCP server, and
+  personalized FSRS weights were deferred — see `plans/specs/2026-06-22-feature-designs.md`.
   **(True at 0.1.0-alpha only; the backlog has since been unfrozen and shipped — see [Unreleased].)**
 
 [Unreleased]: https://github.com/lilialla/learn-everything/compare/main...HEAD

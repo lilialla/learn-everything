@@ -21,6 +21,19 @@ learn-everything is local-first and privacy-conscious by design:
 - **Don't commit secrets.** The Claudian auth token lives in its plugin settings (gitignored);
   never paste tokens or credentials into tracked files.
 
+## Local secret check
+
+Before committing, run:
+
+```bash
+python3 scripts/security_check.py --history
+```
+
+The check scans tracked files, unignored new files, known ignored local runtime configs such as
+`.claudian/` and `.obsidian/`, the required privacy-ignore invariants, and (with `--history`)
+reachable git history. It reports only file paths and rule names; secret values are never printed.
+If it flags a real token, rotate that token, remove it from local files/history, then rerun the check.
+
 ## Scope
 
 This is alpha software with no warranty (MIT). The engine is offline and dependency-free; the

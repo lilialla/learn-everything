@@ -21,7 +21,7 @@ any Skill-capable AI assistant (Claude Code, Obsidian via Claudian, and others).
 language; it teaches one concept at a time, captures what you understood (and where you stumbled),
 and quietly schedules spaced reviews so it actually sticks.
 
-`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: 77 passing`
+`Status: alpha` · `License: MIT` · `Engine: Python stdlib only (zero deps)` · `Tests: full stdlib CI suite`
 
 > You're usually learning several things at once — a professional domain, an exam, a coding skill —
 > and each needs a *different* kind of teaching, so you lose the thread every time you switch.
@@ -48,8 +48,9 @@ and quietly schedules spaced reviews so it actually sticks.
 - **Cross-host skill design.** It runs as a skill in any Skill-capable AI assistant. One recommended
   setup is Obsidian + the Claudian plugin (read on the left, talk to the tutor on the right, notes
   grow live in your vault); Claude Code works too. Everything is plain markdown you own.
-- **Private by default & zero-dependency.** Your learning data never leaves your machine and is
-  gitignored; the engine is pure Python standard library — no `pip install`.
+- **Private by default & zero-dependency.** Your track files stay local and gitignored. When you ask
+  the tutor to learn a source, that source text is sent to the host model you are using; the engine
+  itself is pure Python standard library — no `pip install`.
 
 ## What you get
 
@@ -116,11 +117,11 @@ Two layers, cleanly split:
 - **Portable core** — a deterministic engine (`scripts/`: FSRS scheduling, per-track state files,
   the status board, the daily planner) in Python **standard library only**, plus a **method layer**
   (`methods/*.md`) of pedagogy templates that are just markdown data.
-- **Host adapter** — one thin Claude Code skill (`skills/learn/`) that turns your plain-language
+- **Host adapters** — the primary Claude Code skill (`skills/learn/`) turns your plain-language
   requests into engine calls and teaching loops. **The skill is not the intelligence:** the host
   model does the teaching by following the method layer; the engine only keeps the state honest
-  (it never guesses a due date or a card id). An MCP server / other-host adapters are future work —
-  the core is designed to slot in without a rewrite.
+  (it never guesses a due date or a card id). `mcp/server.py` is an optional MCP host adapter over
+  the same core.
 
 ## The pedagogy toolkit
 
@@ -282,11 +283,15 @@ weights are out of scope until there's real review history.
 ## Project layout
 
 ```
-skills/learn/SKILL.md     the single host-adapter skill (+ FEEDBACK.md improvement log)
+skills/learn/SKILL.md     primary Claude Code skill adapter (+ FEEDBACK.md improvement log)
 methods/*.md              the pedagogy toolkit (data, not code): 7 standalone + 3 layers + modes
 scripts/registry.py       all track/card/registry/planner state I/O (stdlib)
+scripts/structure.py      long-document splitter + curriculum state machine (stdlib)
 scripts/fsrs.py           FSRS-6 scheduler (stdlib)
-tests/                    unit tests (77, CI) — engine + long-doc splitter/curriculum
+scripts/security_check.py repository secret + privacy-ignore check
+adapters/                 optional out-of-core ingestion/search/optimization adapters
+mcp/server.py             optional MCP host adapter over the same core
+tests/                    unit tests (full discovery in CI) — engine + adapters + long-doc curriculum
 plans/                    design specs, feature designs, architecture/optimization plans
 docs/                     audits + the architecture optimization plan
 tracks/                   YOUR learning data (gitignored)
@@ -322,8 +327,8 @@ core stays pip-free and CI stays green:
 ## Status & honesty
 
 This is **alpha**. What's solid and tested: the deterministic engine, the full state machine, every
-CLI, and all file artifacts — end-to-end across every flow (77 unit tests + a from-zero acceptance
-run, all green). What only a real session can prove: the **quality of the teaching dialogue itself**
+CLI, and all file artifacts — covered by full unittest discovery, MCP smoke tests, the secret check,
+and prior manual from-zero acceptance. What only a real session can prove: the **quality of the teaching dialogue itself**
 (that depends on the host model). It hasn't yet been battle-tested across months and many subjects —
 that's the next milestone, not a build task.
 
@@ -332,8 +337,8 @@ that's the next milestone, not a build task.
 Issues and PRs welcome. Keep the invariants: the core stays pip-free stdlib; markdown files are the
 source of truth (`registry.json` is a rebuildable cache); cards stay Obsidian-spaced-repetition
 compatible; teaching comes before cards; nothing is persisted without the learner's approval. New
-pedagogy is just a new `methods/*.md`. Run `python3 -m unittest tests.test_fsrs tests.test_registry`
-before sending a change.
+pedagogy is just a new `methods/*.md`. Run `python3 -m unittest discover -v`,
+`python3 -m unittest mcp.test_server -v`, and `python3 scripts/security_check.py --history` before sending a change.
 
 ## Credits
 

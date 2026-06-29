@@ -10,8 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Run unit tests (stdlib only, no install step)
-        run: python -m unittest tests.test_fsrs tests.test_registry tests.test_structure -v
+        run: |
+          python -m unittest discover -v
+          python -m unittest mcp.test_server -v
+      - name: Run secret check
+        run: python scripts/security_check.py --history

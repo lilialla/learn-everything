@@ -5,9 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Note: a deferred backlog (exam/applied modes, URL & long-document ingestion, MCP server,
-        personalized FSRS weights) is **intentionally frozen** until the core loop is proven sticky
-        for a real user — see CONTRIBUTING.md. Requests in that area are welcome but will be queued.
+        Note: optional adapters and modes are welcome, but they must stay out-of-core, lazy-dependency,
+        privacy-preserving, and subordinate to the core teaching/review loop — see CONTRIBUTING.md.
   - type: textarea
     id: problem
     attributes:
